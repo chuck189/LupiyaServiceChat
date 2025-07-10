@@ -288,12 +288,12 @@ app.post('/webhook/data-exchange', async (req, res) => {
               { "type": "TextHeading", "text": "Your Loan Statement" },
               {
                 "type": "TextBody",
-                "text": result.data.map(item => 
-                  `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\\n` +
-                  `Type: ${item.type}\\n` +
-                  `Amount: ZMW ${item.amountPaid}\\n` +
-                  `Balance: ZMW ${item.loanBalance}\\n\\n`
-                ).join('')
+                "text": result.data.map(item =>
+                  `Date: ${new Date(item.dateOfPayment).toLocaleDateString()} \n` +
+                  `Type: ${item.type}\n` +
+                  `Amount: ZMW ${Number(item.amountPaid).toFixed(2)}\n` +
+                  `Balance: ZMW ${Number(item.loanBalance).toFixed(2)}\n`
+                ).join('\n')
               }
             ]
           }
