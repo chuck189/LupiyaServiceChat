@@ -95,24 +95,26 @@ class LupiyaService {
     }
   }
 
-  static async getBankDetails() {
-    try {
-      const token = await getAccessToken();
-      const response = await axios.get(
-        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': token,
+   static async getBankDetails() {
+      try {
+        const token = await getAccessToken();
+        console.log("Fetching bank details with token:", token);
+        console.log("API URL:", `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`);
+        const response = await axios.get(
+          `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'access_token': token,
+            }
           }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching bank details:', error.message);
-      throw new Error('Failed to fetch bank details');
+        );
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching bank details:', error.message, error.stack);
+        throw new Error('Failed to fetch bank details');
+      }
     }
-  }
 
   static async requestUSSDPayment(idNumber, phoneNumber) {
     try {
