@@ -9,7 +9,7 @@ import express from "express";
 import { decryptRequest, encryptResponse, FlowEndpointException } from "./encryption.js";
 import { getNextScreen } from "./flow.js";
 import crypto from "crypto";
-import lupiyaEndpoints from "./lupiyaep"; // Import lupiyaep.js
+import lupiyaEndpoints from "./lupiyaep.js"; // Import lupiyaep.js
 
 const app = express();
 
