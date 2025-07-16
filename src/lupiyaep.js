@@ -96,25 +96,32 @@ class LupiyaService {
   }
 
    static async getBankDetails() {
-      try {
-        const token = await getAccessToken();
-        console.log("Fetching bank details with token:", token);
-        console.log("API URL:", `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`);
-        const response = await axios.get(
-          `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'access_token': token,
-            }
-          }
-        );
-        return response.data;
-      } catch (error) {
-        console.error('Error fetching bank details:', error.message, error.stack);
-        throw new Error('Failed to fetch bank details');
+  try {
+    // Hardcode the token temporarily for testing
+    const token = 'ALSWoR5UNbUA638yz5ca5pZAjVUqq2R6AnPNGRyWtGX6JkEtXg1VQMygTATnqFEA'; // Replace with the actual token
+    console.log('Using hardcoded token:', token);
+    console.log('API URL:', `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`);
+    const response = await axios.get(
+      `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`, // Use Bearer format
+        },
       }
-    }
+    );
+    console.log('Bank details response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching bank details:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      stack: error.stack,
+    });
+    throw new Error('Failed to fetch bank details');
+  }
+}
 
   static async requestUSSDPayment(idNumber, phoneNumber) {
     try {
