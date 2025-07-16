@@ -1,6 +1,8 @@
 // 1. Add axios dependency (run: npm install axios)
 const axios = require('axios');
 const nodemailer = require('nodemailer');
+const express = require('express'); // Add express
+const app = express(); // Initialize app
 
 const LUPIYA_CONFIG = {
   baseUrl: process.env.LUPIYA_CONFIG_baseUrl,
@@ -20,86 +22,6 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// ... (previous code remains unchanged until app.post('/webhook/data-exchange') ...
-
-app.post('/webhook/data-exchange', async (req, res) => {
-  try {
-    const { action, nrc_number, phone_number, latitude, longitude } = req.body;
-    let result;
-    let responseScreen;
-
-    switch (action) {
-      case 'get_loan_statement':
-        // ... (existing case remains unchanged)
-        break;
-
-      case 'get_wallet_balance':
-        // ... (existing case remains unchanged)
-        break;
-
-      case 'get_bank_details':
-        result = await LupiyaService.getBankDetails();
-        responseScreen = {
-          "id": "BANK_DETAILS_RESULT",
-          "title": "Bank Details",
-          "terminal": true,
-          "layout": {
-            "type": "SingleColumnLayout",
-            "children": [
-              { "type": "TextHeading", "text": "Bank Repayment Details" },
-              {
-                "type": "TextBody",
-                "text": result.data.map(bank => 
-                  `Bank: ${bank.bankName}\n` +
-                  `Account Name: ${bank.accountName}\n` +
-                  `Account Number: ${bank.bankAccountNumber}\n` +
-                  `Branch: ${bank.bankBranch}\n` +
-                  `Branch Code: ${bank.branchCode}\n\n`
-                ).join('')
-              }
-            ]
-          }
-        };
-        break;
-
-      case 'request_ussd_payment':
-        // ... (existing case remains unchanged)
-        break;
-
-      case 'find_nearest_places':
-        // ... (existing case remains unchanged)
-        break;
-
-      default:
-        throw new Error('Unknown action');
-    }
-
-    res.json({
-      "version": "7.1",
-      "screen": responseScreen
-    });
-
-  } catch (error) {
-    console.error('Data exchange error:', error.message);
-    res.json({
-      "version": "7.1",
-      "screen": {
-        "id": "ERROR_SCREEN",
-        "title": "Error",
-        "terminal": true,
-        "layout": {
-          "type": "SingleColumnLayout",
-          "children": [
-            { "type": "TextHeading", "text": "Service Error" },
-            { "type": "TextBody", "text": `Sorry, we encountered an error: ${error.message}\\n\\nPlease try again later.` }
-          ]
-        }
-      }
-    });
-  }
-});
-
-// ... (rest of the code remains unchanged)
 // Function to authenticate and get a new token
 async function fetchAccessToken() {
   try {
@@ -130,7 +52,6 @@ async function getAccessToken() {
   }
   return accessToken;
 }
-
 
 // 3. Add Lupiya service functions
 class LupiyaService {
@@ -213,8 +134,9 @@ class LupiyaService {
     }
   }
 }
+
 // Wallet Balance Endpoint
-app.get('/webhook/wallet-balance', (req, res) => {
+app.get('/wallet-balance', (req, res) => {
   const walletBalanceFlow = {
     "version": "7.1",
     "data_api_version": "3.0",
@@ -263,7 +185,7 @@ app.get('/webhook/wallet-balance', (req, res) => {
 });
 
 // Bank Details Endpoint
-app.get('/webhook/bank-details', (req, res) => {
+app.get('/bank-details', (req, res) => {
   const bankDetailsFlow = {
     "version": "7.1",
     "data_api_version": "3.0",
@@ -304,7 +226,7 @@ app.get('/webhook/bank-details', (req, res) => {
 });
 
 // USSD Payment Endpoint
-app.get('/webhook/ussd-payment', (req, res) => {
+app.get('/ussd-payment', (req, res) => {
   const ussdPaymentFlow = {
     "version": "7.1",
     "data_api_version": "3.0",
@@ -361,8 +283,8 @@ app.get('/webhook/ussd-payment', (req, res) => {
   res.json(ussdPaymentFlow);
 });
 
-// 5. ADD DATA EXCHANGE HANDLER
-app.post('/webhook/data-exchange', async (req, res) => {
+// Data Exchange Handler
+app.post('/data-exchange', async (req, res) => {
   try {
     const { action, nrc_number, phone_number } = req.body;
     let result;
@@ -479,3 +401,4 @@ app.post('/webhook/data-exchange', async (req, res) => {
   }
 });
 
+module.exports = app; // Export the app for use in server.js
