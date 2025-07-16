@@ -10,7 +10,10 @@
   "author": "WhatsApp Flows Team",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.21.2"
+    "axios": "^1.10.0",
+    "crypto": "^1.0.1",
+    "express": "^4.21.2",
+    "nodemailer": "^6.10.1"
   },
   "engines": {
     "node": ">=16.0.0"
