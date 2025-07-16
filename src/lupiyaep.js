@@ -1,8 +1,8 @@
-// 1. Add axios dependency (run: npm install axios)
-const axios = require('axios');
-const nodemailer = require('nodemailer');
-const express = require('express'); // Add express
-const app = express(); // Initialize app
+// 1. Add axios and nodemailer dependencies (run: npm install axios nodemailer)
+import axios from 'axios';
+import nodemailer from 'nodemailer';
+import express from 'express'; // Use ESM import
+const app = express();
 
 const LUPIYA_CONFIG = {
   baseUrl: process.env.LUPIYA_CONFIG_baseUrl,
@@ -401,4 +401,4 @@ app.post('/data-exchange', async (req, res) => {
   }
 });
 
-module.exports = app; // Export the app for use in server.js
+export default app; // Export as default for ESM
