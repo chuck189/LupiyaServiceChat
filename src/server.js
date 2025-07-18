@@ -160,6 +160,37 @@ apiRouter.post('/loan-statement/:nrc', async (req, res) => {
   }
 });
 
+// Loan Statement POST
+apiRouter.post('/loan-statement', async (req, res) => {
+  try {
+    const { nrc } = req.body;
+    if (!nrc) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ NRC number is required'
+      });
+    }
+    const result = await LupiyaService.getLoanStatement(nrc);
+    const message = `📊 *Loan Statement for ${nrc}*\n\n` +
+      result.data.map(item => 
+        `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\n` +
+        `Type: ${item.type}\n` +
+        `Amount: ZMW ${Number(item.amountPaid).toFixed(2)}\n` +
+        `Balance: ZMW ${Number(item.loanBalance).toFixed(2)}\n`
+      ).join('\n---\n\n');
+    res.json({
+      success: true,
+      message,
+      data: result.data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
 // Wallet Balance POST
 apiRouter.post('/wallet-balance', async (req, res) => {
   try {
