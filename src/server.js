@@ -74,7 +74,35 @@ apiRouter.get('/bank-details', async (req, res) => {
     res.status(500).json({ success: false, message: `❌ Error: ${error.message}` });
   }
 });
+
 // Add other apiRouter routes (topup-range, loan-statement, etc.) as previously provided
+// Topup Range POST
+apiRouter.post('/topup-range', async (req, res) => {
+  try {
+    const { nrc } = req.body;
+    if (!nrc) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ NRC number is required'
+      });
+    }
+    const result = await LupiyaService.getLoanTopupRange(nrc);
+    const message = `💰 *Loan Topup Available for ${nrc}*\n\n` +
+      `Loan Type: ${result.loanType}\n` +
+      `Minimum: ZMW ${result.amountRange.min}\n` +
+      `Maximum: ZMW ${result.amountRange.max}`;
+    res.json({
+      success: true,
+      message,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
 
 app.use('/api', apiRouter);
 app.use('/webhook', lupiyaEndpoints);
