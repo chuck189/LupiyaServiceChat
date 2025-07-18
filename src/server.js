@@ -63,20 +63,7 @@ app.get('/health', (req, res) => {
 });
 
 const apiRouter = express.Router();
-apiRouter.get('/bank-details', async (req, res) => {
-  try {
-    const result = await LupiyaService.getBankDetails();
-    const message = `🏦 *Bank Repayment Details*\n\n` + result.data.map(bank => 
-      `Bank: ${bank.bankName}\nAccount: ${bank.bankAccountNumber}\nBranch: ${bank.bankBranch}\n`
-    ).join('\n');
-    res.json({ success: true, message, data: result.data });
-  } catch (error) {
-    res.status(500).json({ success: false, message: `❌ Error: ${error.message}` });
-  }
-});
-
 // Add other apiRouter routes (topup-range, loan-statement, etc.) as previously provided
-const apiRouter = express.Router();
 
 // Bank Details GET (already working)
 apiRouter.get('/bank-details', async (req, res) => {
