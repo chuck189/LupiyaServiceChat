@@ -122,24 +122,26 @@ apiRouter.post('/topup-range', async (req, res) => {
         message: '❌ NRC number is required'
       });
     }
-    const result = await LupiyaService.getLoanTopupRange(nrc);
-    const message = `💰 *Loan Topup Available for ${nrc}*\n\n` +
-      `Loan Type: ${result.loanType}\n` +
-      `Minimum: ZMW ${result.amountRange.min}\n` +
-      `Maximum: ZMW ${result.amountRange.max}`;
-     // `📌 *Note:* Please keep your top-up amount between ZMW 0 and ${maxRounded}!`;
-    res.json({
-      success: true,
-      message,
-      data: result
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: `❌ Error: ${error.message}`
-    });
-  }
-});
+      const result = await LupiyaService.getLoanTopupRange(nrc);
+      const maxValue = result.amountRange.max;
+      const maxRounded = typeof maxValue === 'number' ? maxValue.toFixed(2) : maxValue; // Safe rounding
+      const message = `💰 *Loan Topup Available for ${nrc}*\n\n` +
+        `Loan Type: ${result.loanType}\n` +
+        `Minimum: ZMW ${result.amountRange.min}\n` +
+        `Maximum: ZMW ${maxRounded}\n` +
+        `📌 *Note:* Please keep your top-up amount between ZMW 0 and ${maxRounded}!`;
+      res.json({
+        success: true,
+        message,
+        data: result
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: `❌ Error: ${error.message}`
+      });
+    }
+  });
 
 // Loan Statement GET
 apiRouter.post('/loan-statement/:nrc', async (req, res) => {
