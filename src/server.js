@@ -136,7 +136,7 @@ apiRouter.post('/topup-range', async (req, res) => {
 });
 
 // Loan Statement GET
-apiRouter.get('/loan-statement/:nrc', async (req, res) => {
+apiRouter.post('/loan-statement/:nrc', async (req, res) => {
   try {
     const { nrc } = req.params;
     const result = await LupiyaService.getLoanStatement(nrc);
@@ -160,7 +160,6 @@ apiRouter.get('/loan-statement/:nrc', async (req, res) => {
   }
 });
 
-//GET Wallet Balance
 // Wallet Balance POST
 apiRouter.post('/wallet-balance', async (req, res) => {
   try {
