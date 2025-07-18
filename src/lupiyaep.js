@@ -9,9 +9,6 @@ const LUPIYA_CONFIG = {
 };
 
 export { app as default, LupiyaService };
-
-// let accessToken = null;
-// let tokenExpiry = null;
 app.use(express.json());
 
 const transporter = nodemailer.createTransport({
@@ -25,35 +22,15 @@ const transporter = nodemailer.createTransport({
 });
 
 // Function to authenticate and get a new token
-async function fetchAccessToken() {
-  try {
-    const response = await axios.post(
-      `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/token`,
-      {
-        email: process.env.LUPIYA_EMAIL,
-        password: process.env.LUPIYA_PASSWORD,
-      },
-      {
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
-    accessToken = response.data.access_token;
-    // If the API returns expiry, set tokenExpiry accordingly
-    // tokenExpiry = Date.now() + (response.data.expires_in * 1000);
-    return accessToken;
-  } catch (error) {
-    console.error('Error fetching access token:', error.message);
-    throw new Error('Failed to fetch access token');
+async function getAccessToken() {
+  const token = process.env.LUPIYA_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error('accessToken is not defined in environment variables');
   }
+  return token;
 }
 
 // Helper to get a valid token (fetch if missing/expired)
-async function getAccessToken() {
-  if (!accessToken /* || Date.now() > tokenExpiry */) {
-    await fetchAccessToken();
-  }
-  return accessToken;
-}
 
 // 3. Add Lupiya service functions
 class LupiyaService {
