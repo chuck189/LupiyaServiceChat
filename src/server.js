@@ -127,6 +127,7 @@ apiRouter.post('/topup-range', async (req, res) => {
       `Loan Type: ${result.loanType}\n` +
       `Minimum: ZMW ${result.amountRange.min}\n` +
       `Maximum: ZMW ${result.amountRange.max}`;
+      `📌 *Note:* Please keep your top-up amount between ZMW 0 and ${maxRounded}!`;
     res.json({
       success: true,
       message,
