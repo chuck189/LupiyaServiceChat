@@ -9,10 +9,7 @@ import express from "express";
 import { decryptRequest, encryptResponse, FlowEndpointException } from "./encryption.js";
 import { getNextScreen } from "./flow.js";
 import crypto from "crypto";
-
-const { default: lupiyaEndpoints, LupiyaService } = require("./lupiyaep.js");
-//import { default as lupiyaEndpoints, LupiyaService } from "./lupiyaep.js";
-//export { app as default, LupiyaService };
+import { default as lupiyaEndpoints, LupiyaService } from "./lupiyaep.js";
 const app = express();
 
 app.use(
