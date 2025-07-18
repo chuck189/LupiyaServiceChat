@@ -66,13 +66,18 @@ const apiRouter = express.Router();
 // Add other apiRouter routes (topup-range, loan-statement, etc.) as previously provided
 
 // Bank Details GET (already working)
+// Bank Details GET
 apiRouter.get('/bank-details', async (req, res) => {
   try {
     const result = await LupiyaService.getBankDetails();
-    const message = `🏦 *Bank Repayment Details*\n\n` +
+    const accountName = result.data[0].accountName; // Assuming same account name for all
+    const message = `🏦 *Bank Repayment Details for ${accountName}*\n\n` +
       result.data.map(bank => 
-        `Bank: ${bank.bankName}\nAccount: ${bank.bankAccountNumber}\nBranch: ${bank.bankBranch}\n`
-      ).join('\n');
+        `💳 *${bank.bankName}*\n` +
+        `  - Account Number: ${bank.bankAccountNumber}\n` +
+        `  - Branch: ${bank.bankBranch}\n` +
+        `  - Branch Code: ${bank.branchCode || 'Not available'}\n\n`
+      ).join('');
     res.json({
       success: true,
       message,
