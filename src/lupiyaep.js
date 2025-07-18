@@ -5,11 +5,12 @@ import express from 'express'; // Use ESM import
 const app = express();
 
 const LUPIYA_CONFIG = {
-  baseUrl: process.env.LUPIYA_CONFIG_baseUrl,
+  baseUrl: process.env.LUPIYA_BASE_URL,
 };
+export { app as default, LupiyaService };
 
-let accessToken = null;
-let tokenExpiry = null;
+// let accessToken = null;
+// let tokenExpiry = null;
 app.use(express.json());
 
 const transporter = nodemailer.createTransport({
@@ -94,35 +95,46 @@ class LupiyaService {
       throw new Error('Failed to fetch wallet balance');
     }
   }
-
+// Get BankDetails
    static async getBankDetails() {
   try {
-    // Hardcode the token temporarily for testing
-    const token = 'ALSWoR5UNbUA638yz5ca5pZAjVUqq2R6AnPNGRyWtGX6JkEtXg1VQMygTATnqFEA'; // Replace with the actual token
-    console.log('Using hardcoded token:', token);
-    console.log('API URL:', `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`);
+    const token = await getAccessToken();
     const response = await axios.get(
       `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`, // Use Bearer format
-        },
+          'access_token': token
+        }
       }
     );
-    console.log('Bank details response:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error fetching bank details:', {
-      message: error.message,
-      status: error.response?.status,
-      data: error.response?.data,
-      stack: error.stack,
-    });
+    console.error('Error fetching bank details:', error.message);
     throw new Error('Failed to fetch bank details');
   }
 }
 
+//Get Loan Topup Range By ID Number
+static async getLoanTopupRange(idNumber) {
+  try {
+    const token = await getAccessToken();
+    const response = await axios.post(
+      `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/top-up-range`,
+      { idNumber },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': token
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching loan topup range:', error.message);
+    throw new Error('Failed to fetch loan topup range');
+  }
+}
   static async requestUSSDPayment(idNumber, phoneNumber) {
     try {
       const token = await getAccessToken();
@@ -144,6 +156,234 @@ class LupiyaService {
   }
 }
 
+// Health Check Endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    service: "Lupiya WhatsApp API Service",
+    version: "2.0.0",
+    endpoints: [
+      "GET /api/loan-statement/:nrc - Get loan statement",
+      "POST /api/loan-statement - Get loan statement (JSON body)",
+      "GET /api/topup-range/:nrc - Get loan topup range",
+      "POST /api/topup-range - Get loan topup range (JSON body)",
+      "GET /api/wallet-balance/:nrc - Get wallet balance",
+      "POST /api/wallet-balance - Get wallet balance (JSON body)",
+      "GET /api/bank-details - Get bank repayment details",
+      "POST /api/ussd-payment - Request USSD payment",
+      "POST /webhook - WhatsApp webhook receiver"
+    ],
+    lupiya_config: {
+      baseUrl: process.env.LUPIYA_BASE_URL,
+      hasToken: !!process.env.LUPIYA_ACCESS_TOKEN
+    }
+  });
+});
+
+// API Router for Direct Endpoints
+const apiRouter = express.Router();
+
+// Loan Statement GET
+apiRouter.get('/loan-statement/:nrc', async (req, res) => {
+  try {
+    const { nrc } = req.params;
+    const result = await LupiyaService.getLoanStatement(nrc);
+    const message = `📊 *Loan Statement for ${nrc}*\n\n` + 
+      result.data.map(item => 
+        `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\n` +
+        `Type: ${item.type}\n` +
+        `Amount: ZMW ${Number(item.amountPaid).toFixed(2)}\n` +
+        `Balance: ZMW ${Number(item.loanBalance).toFixed(2)}\n`
+      ).join('\n---\n\n');
+    res.json({
+      success: true,
+      message,
+      data: result.data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
+// Loan Statement POST
+apiRouter.post('/loan-statement', async (req, res) => {
+  try {
+    const { nrc } = req.body;
+    if (!nrc) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ NRC number is required'
+      });
+    }
+    const result = await LupiyaService.getLoanStatement(nrc);
+    const message = `📊 *Loan Statement for ${nrc}*\n\n` + 
+      result.data.map(item => 
+        `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\n` +
+        `Type: ${item.type}\n` +
+        `Amount: ZMW ${Number(item.amountPaid).toFixed(2)}\n` +
+        `Balance: ZMW ${Number(item.loanBalance).toFixed(2)}\n`
+      ).join('\n---\n\n');
+    res.json({
+      success: true,
+      message,
+      data: result.data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
+// Topup Range GET
+apiRouter.get('/topup-range/:nrc', async (req, res) => {
+  try {
+    const { nrc } = req.params;
+    const result = await LupiyaService.getLoanTopupRange(nrc);
+    const message = `💰 *Loan Topup Available for ${nrc}*\n\n` +
+      `Loan Type: ${result.loanType}\n` +
+      `Minimum: ZMW ${result.amountRange.min}\n` +
+      `Maximum: ZMW ${result.amountRange.max}`;
+    res.json({
+      success: true,
+      message,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
+// Topup Range POST
+apiRouter.post('/topup-range', async (req, res) => {
+  try {
+    const { nrc } = req.body;
+    if (!nrc) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ NRC number is required'
+      });
+    }
+    const result = await LupiyaService.getLoanTopupRange(nrc);
+    const message = `💰 *Loan Topup Available for ${nrc}*\n\n` +
+      `Loan Type: ${result.loanType}\n` +
+      `Minimum: ZMW ${result.amountRange.min}\n` +
+      `Maximum: ZMW ${result.amountRange.max}`;
+    res.json({
+      success: true,
+      message,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
+// Wallet Balance GET
+apiRouter.get('/wallet-balance/:nrc', async (req, res) => {
+  try {
+    const { nrc } = req.params;
+    const result = await LupiyaService.getWalletBalance(nrc);
+    const message = `💰 *Wallet Balance for ${nrc}*\n\nCurrent Balance: ZMW ${result.walletBalance}`;
+    res.json({
+      success: true,
+      message,
+      data: { walletBalance: result.walletBalance }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
+// Wallet Balance POST
+apiRouter.post('/wallet-balance', async (req, res) => {
+  try {
+    const { nrc } = req.body;
+    if (!nrc) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ NRC number is required'
+      });
+    }
+    const result = await LupiyaService.getWalletBalance(nrc);
+    const message = `💰 *Wallet Balance for ${nrc}*\n\nCurrent Balance: ZMW ${result.walletBalance}`;
+    res.json({
+      success: true,
+      message,
+      data: { walletBalance: result.walletBalance }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
+// Bank Details GET
+apiRouter.get('/bank-details', async (req, res) => {
+  try {
+    const result = await LupiyaService.getBankDetails();
+    const message = `🏦 *Bank Repayment Details*\n\n` +
+      result.data.map(bank => 
+        `Bank: ${bank.bankName}\n` +
+        `Account: ${bank.bankAccountNumber}\n` +
+        `Branch: ${bank.bankBranch}\n`
+      ).join('\n');
+    res.json({
+      success: true,
+      message,
+      data: result.data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
+// USSD Payment POST
+apiRouter.post('/ussd-payment', async (req, res) => {
+  try {
+    const { nrc, phoneNumber } = req.body;
+    if (!nrc || !phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ NRC number and phone number are required'
+      });
+    }
+    const result = await LupiyaService.requestUSSDPayment(nrc, phoneNumber);
+    const message = `📱 *USSD Payment Request*\n\n${result.message}`;
+    res.json({
+      success: true,
+      message,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
+// Mount the API router under /api
+app.use('/api', apiRouter);
 // Wallet Balance Endpoint
 app.get('/wallet-balance', (req, res) => {
   const walletBalanceFlow = {
@@ -409,5 +649,3 @@ app.post('/data-exchange', async (req, res) => {
     });
   }
 });
-
-export default app; // Export as default for ESM

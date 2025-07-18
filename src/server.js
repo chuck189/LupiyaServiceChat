@@ -9,8 +9,7 @@ import express from "express";
 import { decryptRequest, encryptResponse, FlowEndpointException } from "./encryption.js";
 import { getNextScreen } from "./flow.js";
 import crypto from "crypto";
-import lupiyaEndpoints from "./lupiyaep.js"; // Import lupiyaep.js
-
+import { default as lupiyaEndpoints, LupiyaService } from "./lupiyaep.js";
 const app = express();
 
 app.use(
@@ -21,6 +20,7 @@ app.use(
     },
   }),
 );
+
 
 const { APP_SECRET, PRIVATE_KEY, PASSPHRASE = "", PORT = "3000" } = process.env;
 
@@ -76,6 +76,12 @@ Checkout README.md to start.</pre>`);
 // Mount lupiyaep endpoints under /webhook
 console.log("Mounting Lupiya endpoints...");
 app.use('/webhook', lupiyaEndpoints);
+
+//Mount lupiyaep endpoints under /webhook
+app.post('/webhook', (req, res) => {
+  // Handle WhatsApp webhook events here
+  res.sendStatus(200);
+});
 
 app.use((req, res) => {
   console.log(`404: Route not found for ${req.url}`);
