@@ -5,8 +5,9 @@ import express from 'express'; // Use ESM import
 const app = express();
 
 const LUPIYA_CONFIG = {
-  baseUrl: process.env.LUPIYA_BASE_URL,
+  baseUrl: process.env.LUPIYA_BASE_URL || 'https://backend.qa.lupiya.com',
 };
+
 export { app as default, LupiyaService };
 
 // let accessToken = null;
