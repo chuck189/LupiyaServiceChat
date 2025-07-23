@@ -12,7 +12,7 @@ export { app as default, LupiyaService };
 app.use(express.json());
 
 const transporter = nodemailer.createTransport({
-  host: 'info@lupiya.com', // Replace with your SMTP host
+  host: 'mail.d2ctelcare.com', // Replace with your SMTP host
   port: 465, // Common SMTP port, adjust if needed (e.g., 465 for SSL)
   secure: false, // true for 465, false for other ports
   auth: {
@@ -152,7 +152,7 @@ app.post('/send-email', async (req, res) => {
 async function sendWebhookEmail(decryptedBody, screenResponse) {
   try {
     const mailOptions = {
-      from: SMTP_EMAIL || 'supportlupiya@d2ctelcare.com', // Sender email
+      from: SMTP_EMAIL || 'chibuye@d2ctelcare.com', // Sender email
       to: 'nick.snapper@d2ctelcare.com', // Replace with the recipient's email address
       subject: 'WhatsApp Chatbot Webhook Triggered',
       text: `
