@@ -134,6 +134,21 @@ static async getLoanTopupRange(idNumber) {
   }
 }
 
+// New endpoint to send email with request body
+app.post('/send-email', async (req, res) => {
+  try {
+    if (!process.env.SMTP_RECIPIENT) {
+      throw new Error('SMTP_RECIPIENT is not set in environment variables');
+    }
+
+    await sendWebhookEmail(req.body);
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('Error in /webhook/send-email:', error.message);
+    res.status(500).json({ error: 'Failed to send email', details: error.message });
+  }
+});
+
 // Health Check Endpoint
 app.get('/health', (req, res) => {
   res.json({
