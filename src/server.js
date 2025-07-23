@@ -81,11 +81,8 @@ app.post("/send-email", async (req, res) => {
     const mailOptions = {
       from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
-      subject: `Chatbot Email Endpoint Triggered at ${new Date().toISOString()}`,
+      subject: `FRAUD REPORT ${new Date().toISOString()}`,
       text: `
-        Chatbot email endpoint was hit.
-
-        Request Body:
         ${JSON.stringify(req.body, null, 2)}
       `,
     };
