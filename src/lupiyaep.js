@@ -16,8 +16,8 @@ const transporter = nodemailer.createTransport({
   port: 465, // Common SMTP port, adjust if needed (e.g., 465 for SSL)
   secure: false, // true for 465, false for other ports
   auth: {
-    user: 'supportlupiya@d2ctelcare.com', // Replace with your SMTP username
-    pass: '!A#^X#)cnp0M' // Replace with your SMTP password
+    user: 'chibuye@d2ctelcare.com', // Replace with your SMTP username
+    pass: 's3fqu6]Ebj@Q' // Replace with your SMTP password
   }
 });
 

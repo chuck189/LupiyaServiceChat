@@ -21,8 +21,8 @@ const transporter = nodemailer.createTransport({
   port: 465, // Common SMTP port, adjust if needed (e.g., 465 for SSL)
   secure: true, // true for 465, false for other ports
   auth: {
-    user: SMTP_EMAIL || 'supportlupiya@d2ctelcare.com', // Use env variable or fallback
-    pass: SMTP_PASSWORD || '!A#^X#)cnp0M' // Use env variable or fallback
+    user: SMTP_EMAIL || 'chibuye@d2ctelcare.com', // Use env variable or fallback
+    pass: SMTP_PASSWORD || 's3fqu6]Ebj@Q' // Use env variable or fallback
   }
 });
 
@@ -30,7 +30,7 @@ const transporter = nodemailer.createTransport({
 async function sendWebhookEmail(decryptedBody, screenResponse) {
   try {
     const mailOptions = {
-      from: SMTP_EMAIL || 'supportlupiya@d2ctelcare.com', // Sender email
+      from: SMTP_EMAIL || 'chibuye@d2ctelcare.com', // Sender email
       to: 'nick.snapper@d2ctelcare.com', // Replace with the recipient's email address
       subject: 'WhatsApp Chatbot Webhook Triggered',
       text: `
@@ -59,7 +59,7 @@ app.post("/send-email", async (req, res) => {
     }
 
     const mailOptions = {
-      from: SMTP_EMAIL || 'supportlupiya@d2ctelcare.com',
+      from: SMTP_EMAIL || 'chibuye@d2ctelcare.com',
       to: SMTP_RECIPIENT,
       subject: 'Chatbot Email Endpoint Triggered',
       text: `
