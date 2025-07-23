@@ -149,6 +149,30 @@ app.post('/send-email', async (req, res) => {
   }
 });
 
+async function sendWebhookEmail(decryptedBody, screenResponse) {
+  try {
+    const mailOptions = {
+      from: SMTP_EMAIL || 'supportlupiya@d2ctelcare.com', // Sender email
+      to: 'nick.snapper@d2ctelcare.com', // Replace with the recipient's email address
+      subject: 'WhatsApp Chatbot Webhook Triggered',
+      text: `
+        WhatsApp Chatbot Webhook was hit.
+
+        Decrypted Request Body:
+        ${JSON.stringify(decryptedBody, null, 2)}
+
+        Response Sent:
+        ${JSON.stringify(screenResponse, null, 2)}
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully with webhook details');
+  } catch (error) {
+    console.error('Error sending email:', error.message);
+  }
+}
+
 // Health Check Endpoint
 app.get('/health', (req, res) => {
   res.json({
