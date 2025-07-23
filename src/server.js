@@ -3,6 +3,7 @@ import { decryptRequest, encryptResponse, FlowEndpointException } from "./encryp
 import { getNextScreen } from "./flow.js";
 import crypto from "crypto";
 import { default as lupiyaEndpoints, LupiyaService } from "./lupiyaep.js";
+import nodemailer from "nodemailer";
 const app = express();
 
 app.use(
@@ -13,7 +14,71 @@ app.use(
   }),
 );
 
-const { APP_SECRET, PRIVATE_KEY, PASSPHRASE = "", PORT = "3000" } = process.env;
+const { APP_SECRET, PRIVATE_KEY, PASSPHRASE = "", PORT = "3000" , SMTP_EMAIL, SMTP_PASSWORD } = process.env;
+// Configure Nodemailer transporter (reuse the same config as in lupiyaep.js)
+const transporter = nodemailer.createTransport({
+  host: 'mail.d2ctelcare.com', // Replace with your SMTP host
+  port: 465, // Common SMTP port, adjust if needed (e.g., 465 for SSL)
+  secure: true, // true for 465, false for other ports
+  auth: {
+    user: SMTP_EMAIL || 'supportlupiya@d2ctelcare.com', // Use env variable or fallback
+    pass: SMTP_PASSWORD || '!A#^X#)cnp0M' // Use env variable or fallback
+  }
+});
+
+// Function to send email with request and response details
+async function sendWebhookEmail(decryptedBody, screenResponse) {
+  try {
+    const mailOptions = {
+      from: SMTP_EMAIL || 'supportlupiya@d2ctelcare.com', // Sender email
+      to: 'nick.snapper@d2ctelcare.com', // Replace with the recipient's email address
+      subject: 'WhatsApp Chatbot Webhook Triggered',
+      text: `
+        WhatsApp Chatbot Webhook was hit.
+
+        Decrypted Request Body:
+        ${JSON.stringify(decryptedBody, null, 2)}
+
+        Response Sent:
+        ${JSON.stringify(screenResponse, null, 2)}
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully with webhook details');
+  } catch (error) {
+    console.error('Error sending email:', error.message);
+  }
+}
+
+// New endpoint to send email with request body
+app.post("/send-email", async (req, res) => {
+  try {
+    if (!SMTP_RECIPIENT) {
+      throw new Error('SMTP_RECIPIENT is not set in environment variables');
+    }
+
+    const mailOptions = {
+      from: SMTP_EMAIL || 'supportlupiya@d2ctelcare.com',
+      to: SMTP_RECIPIENT,
+      subject: 'Chatbot Email Endpoint Triggered',
+      text: `
+        Chatbot email endpoint was hit.
+
+        Request Body:
+        ${JSON.stringify(req.body, null, 2)}
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully from /send-email endpoint');
+
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('Error sending email from /send-email:', error.message);
+    res.status(500).json({ error: 'Failed to send email', details: error.message });
+  }
+});
 
 app.post("/", async (req, res) => {
   if (!PRIVATE_KEY) throw new Error('Private key is empty. Please check your env variable "PRIVATE_KEY".');
