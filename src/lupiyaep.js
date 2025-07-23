@@ -145,12 +145,13 @@ app.post('/send-email', async (req, res) => {
       throw new Error('SMTP_RECIPIENT is not set in environment variables');
     }
 
-   const mailOptions = {
+  const mailOptions = {
       from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
       subject: "FRAUD REPORT",
       text: `
-         A fraud report has been filed via the chatbot webhook email endpoint
+        A fraud report has been triggered via the chatbot webhook email endpoint.
+        Chatbot Message: ${message}
       `,
     };
 
