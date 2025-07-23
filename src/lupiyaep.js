@@ -148,12 +148,11 @@ app.post('/send-email', async (req, res) => {
     const mailOptions = {
       from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
-      subject: `Chatbot Webhook Email Endpoint Triggered at ${new Date().toISOString()}`,
+      subject: `FRAUD REPORT at ${new Date().toISOString()}`,
       text: `
-        Chatbot webhook email endpoint was hit.
-
-        Request Body:
-        ${JSON.stringify(req.body, null, 2)}
+        A fraud report has been triggered via the WhatsApp chatbot webhook.
+        Decrypted Request Body: ${JSON.stringify(decryptedBody, null, 2)}
+        Response Sent: ${JSON.stringify(screenResponse, null, 2)}
       `,
     };
 

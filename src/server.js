@@ -51,18 +51,13 @@ async function sendWebhookEmail(decryptedBody, screenResponse) {
     const mailOptions = {
       from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
-      subject: `FRAUD REPORT ${new Date().toISOString()}`,
-      // text: `
-      //   WhatsApp Chatbot Webhook was hit.
-
-      //   Decrypted Request Body:
-      //   ${JSON.stringify(decryptedBody, null, 2)}
-
-      //   Response Sent:
-      //   ${JSON.stringify(screenResponse, null, 2)}
-      // `,
+      subject: `FRAUD REPORT at ${new Date().toISOString()}`,
+      text: `
+        A fraud report has been triggered via the WhatsApp chatbot webhook.
+        Decrypted Request Body: ${JSON.stringify(decryptedBody, null, 2)}
+        Response Sent: ${JSON.stringify(screenResponse, null, 2)}
+      `,
     };
-
     await transporter.sendMail(mailOptions);
     console.log('Email sent successfully with webhook details');
   } catch (error) {
@@ -81,9 +76,11 @@ app.post("/send-email", async (req, res) => {
     const mailOptions = {
       from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
-      subject: `FRAUD REPORT ${new Date().toISOString()}`,
+      subject: `FRAUD REPORT at ${new Date().toISOString()}`,
       text: `
-        ${JSON.stringify(req.body, null, 2)}
+        A fraud report has been triggered via the WhatsApp chatbot webhook.
+        Decrypted Request Body: ${JSON.stringify(decryptedBody, null, 2)}
+        Response Sent: ${JSON.stringify(screenResponse, null, 2)}
       `,
     };
 
