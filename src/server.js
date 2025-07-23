@@ -11,28 +11,47 @@ app.use(
     verify: (req, res, buf, encoding) => {
       req.rawBody = buf?.toString(encoding || "utf8");
     },
-  }),
+  })
 );
 
-const { APP_SECRET, PRIVATE_KEY, PASSPHRASE = "", PORT = "3000" , SMTP_EMAIL, SMTP_PASSWORD } = process.env;
-// Configure Nodemailer transporter (reuse the same config as in lupiyaep.js)
+const { 
+  APP_SECRET, 
+  PRIVATE_KEY, 
+  PASSPHRASE = "", 
+  PORT = "10000", 
+  SMTP_EMAIL, 
+  SMTP_PASSWORD, 
+  SMTP_RECIPIENT, 
+  SMTP_HOST = "mail.d2ctelcare.com", 
+  SMTP_PORT = "465" 
+} = process.env;
+
+// Log environment variables for debugging
+console.log("Environment Variables:", { SMTP_EMAIL, SMTP_PASSWORD, SMTP_RECIPIENT, SMTP_HOST, SMTP_PORT });
+
+// Configure Nodemailer transporter
 const transporter = nodemailer.createTransport({
-  host: 'mail.d2ctelcare.com', // Replace with your SMTP host
-  port: 465, // Common SMTP port, adjust if needed (e.g., 465 for SSL)
-  secure: true, // true for 465, false for other ports
+  host: SMTP_HOST,
+  port: parseInt(SMTP_PORT),
+  secure: parseInt(SMTP_PORT) === 465,
   auth: {
-    user: SMTP_EMAIL || 'chibuye@d2ctelcare.com', // Use env variable or fallback
-    pass: SMTP_PASSWORD || 's3fqu6]Ebj@Q' // Use env variable or fallback
+    user: SMTP_EMAIL,
+    pass: SMTP_PASSWORD
   }
 });
 
 // Function to send email with request and response details
 async function sendWebhookEmail(decryptedBody, screenResponse) {
+  if (!SMTP_EMAIL || !SMTP_PASSWORD || !SMTP_RECIPIENT) {
+    console.error("Missing required SMTP environment variables:", { SMTP_EMAIL, SMTP_PASSWORD, SMTP_RECIPIENT });
+    throw new Error('SMTP_EMAIL, SMTP_PASSWORD, or SMTP_RECIPIENT is not defined in environment variables');
+  }
+
   try {
     const mailOptions = {
-      from: SMTP_EMAIL || 'chibuye@d2ctelcare.com', // Sender email
-      to: 'nick.snapper@d2ctelcare.com', // Replace with the recipient's email address
-      subject: 'WhatsApp Chatbot Webhook Triggered',
+      from: SMTP_EMAIL,
+      to: SMTP_RECIPIENT,
+      subject: `WhatsApp Chatbot Webhook Triggered at ${new Date().toISOString()}`,
       text: `
         WhatsApp Chatbot Webhook was hit.
 
@@ -48,6 +67,7 @@ async function sendWebhookEmail(decryptedBody, screenResponse) {
     console.log('Email sent successfully with webhook details');
   } catch (error) {
     console.error('Error sending email:', error.message);
+    throw error;
   }
 }
 
@@ -59,9 +79,9 @@ app.post("/send-email", async (req, res) => {
     }
 
     const mailOptions = {
-      from: SMTP_EMAIL || 'chibuye@d2ctelcare.com',
+      from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
-      subject: 'Chatbot Email Endpoint Triggered',
+      subject: `Chatbot Email Endpoint Triggered at ${new Date().toISOString()}`,
       text: `
         Chatbot email endpoint was hit.
 
@@ -99,6 +119,8 @@ app.post("/", async (req, res) => {
   const screenResponse = await getNextScreen(decryptedBody);
   console.log("👉 Response to Encrypt:", screenResponse);
 
+  await sendWebhookEmail(decryptedBody, screenResponse);
+
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 });
 
@@ -128,14 +150,12 @@ app.get('/health', (req, res) => {
 });
 
 const apiRouter = express.Router();
-// Add other apiRouter routes (topup-range, loan-statement, etc.) as previously provided
 
-// Bank Details GET (already working)
 // Bank Details GET
 apiRouter.get('/bank-details', async (req, res) => {
   try {
     const result = await LupiyaService.getBankDetails();
-    const accountName = result.data[0].accountName; // Assuming same account name for all
+    const accountName = result.data[0].accountName;
     const message = `🏦 *Bank Repayment Details for ${accountName}*\n\n` +
       result.data.map(bank => 
         `💳 *${bank.bankName}*\n` +
@@ -177,6 +197,7 @@ apiRouter.get('/topup-range/:nrc', async (req, res) => {
     });
   }
 });
+
 // Topup Range POST
 apiRouter.post('/topup-range', async (req, res) => {
   try {
@@ -187,26 +208,26 @@ apiRouter.post('/topup-range', async (req, res) => {
         message: '❌ NRC number is required'
       });
     }
-      const result = await LupiyaService.getLoanTopupRange(nrc);
-      const maxValue = result.amountRange.max;
-      const maxRounded = typeof maxValue === 'number' ? maxValue.toFixed(2) : maxValue; // Safe rounding
-      const message = `💰 *Loan Topup Available for ${nrc}*\n\n` +
-        `Loan Type: ${result.loanType}\n` +
-        `Minimum: ZMW ${result.amountRange.min}\n` +
-        `Maximum: ZMW ${maxRounded}\n` +
-        `📌 *Note:* Please keep your top-up amount between ZMW 0 and ${maxRounded}!`;
-      res.json({
-        success: true,
-        message,
-        data: result
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: `❌ Error: ${error.message}`
-      });
-    }
-  });
+    const result = await LupiyaService.getLoanTopupRange(nrc);
+    const maxValue = result.amountRange.max;
+    const maxRounded = typeof maxValue === 'number' ? maxValue.toFixed(2) : maxValue;
+    const message = `💰 *Loan Topup Available for ${nrc}*\n\n` +
+      `Loan Type: ${result.loanType}\n` +
+      `Minimum: ZMW ${result.amountRange.min}\n` +
+      `Maximum: ZMW ${maxRounded}\n` +
+      `📌 *Note:* Please keep your top-up amount between ZMW 0 and ${maxRounded}!`;
+    res.json({
+      success: true,
+      message,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
 
 // Loan Statement GET
 apiRouter.post('/loan-statement/:nrc', async (req, res) => {
@@ -264,16 +285,10 @@ apiRouter.post('/loan-statement', async (req, res) => {
   }
 });
 
-// Wallet Balance POST
-apiRouter.post('/wallet-balance', async (req, res) => {
+// Wallet Balance GET
+apiRouter.get('/wallet-balance/:nrc', async (req, res) => {
   try {
-    const { nrc } = req.body;
-    if (!nrc) {
-      return res.status(400).json({
-        success: false,
-        message: '❌ NRC number is required'
-      });
-    }
+    const { nrc } = req.params;
     const result = await LupiyaService.getWalletBalance(nrc);
     const message = `💰 *Wallet Balance for ${nrc}*\n\nCurrent Balance: ZMW ${result.walletBalance}`;
     res.json({

@@ -11,13 +11,19 @@ const LUPIYA_CONFIG = {
 export { app as default, LupiyaService };
 app.use(express.json());
 
+const { SMTP_EMAIL, SMTP_PASSWORD, SMTP_RECIPIENT, SMTP_HOST = "mail.d2ctelcare.com", SMTP_PORT = "465" } = process.env;
+
+// Log environment variables for debugging
+console.log("Lupiyaep Environment Variables:", { SMTP_EMAIL, SMTP_PASSWORD, SMTP_RECIPIENT, SMTP_HOST, SMTP_PORT });
+
+// Configure Nodemailer transporter
 const transporter = nodemailer.createTransport({
-  host: 'mail.d2ctelcare.com', // Replace with your SMTP host
-  port: 465, // Common SMTP port, adjust if needed (e.g., 465 for SSL)
-  secure: true, // true for 465, false for other ports
+  host: SMTP_HOST,
+  port: parseInt(SMTP_PORT),
+  secure: parseInt(SMTP_PORT) === 465,
   auth: {
-    user: 'chibuye@d2ctelcare.com', // Replace with your SMTP username
-    pass: 's3fqu6]Ebj@Q' // Replace with your SMTP password
+    user: SMTP_EMAIL,
+    pass: SMTP_PASSWORD
   }
 });
 
@@ -30,9 +36,7 @@ async function getAccessToken() {
   return token;
 }
 
-// Helper to get a valid token (fetch if missing/expired)
-
-// 3. Add Lupiya service functions
+// Lupiya service functions
 class LupiyaService {
   static async getLoanStatement(idNumber) {
     try {
@@ -73,46 +77,46 @@ class LupiyaService {
       throw new Error('Failed to fetch wallet balance');
     }
   }
-// Get BankDetails
-   static async getBankDetails() {
-  try {
-    const token = await getAccessToken();
-    const response = await axios.get(
-      `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': token
-        }
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching bank details:', error.message);
-    throw new Error('Failed to fetch bank details');
-  }
-}
 
-//Get Loan Topup Range By ID Number
-static async getLoanTopupRange(idNumber) {
-  try {
-    const token = await getAccessToken();
-    const response = await axios.post(
-      `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/top-up-range`,
-      { idNumber },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': token
+  static async getBankDetails() {
+    try {
+      const token = await getAccessToken();
+      const response = await axios.get(
+        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': token
+          }
         }
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching loan topup range:', error.message);
-    throw new Error('Failed to fetch loan topup range');
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching bank details:', error.message);
+      throw new Error('Failed to fetch bank details');
+    }
   }
-}
+
+  static async getLoanTopupRange(idNumber) {
+    try {
+      const token = await getAccessToken();
+      const response = await axios.post(
+        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/top-up-range`,
+        { idNumber },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': token
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching loan topup range:', error.message);
+      throw new Error('Failed to fetch loan topup range');
+    }
+  }
+
   static async requestUSSDPayment(idNumber, phoneNumber) {
     try {
       const token = await getAccessToken();
@@ -137,41 +141,31 @@ static async getLoanTopupRange(idNumber) {
 // New endpoint to send email with request body
 app.post('/send-email', async (req, res) => {
   try {
-    if (!process.env.SMTP_RECIPIENT) {
+    if (!SMTP_RECIPIENT) {
       throw new Error('SMTP_RECIPIENT is not set in environment variables');
     }
 
-    await sendWebhookEmail(req.body);
+    const mailOptions = {
+      from: SMTP_EMAIL,
+      to: SMTP_RECIPIENT,
+      subject: `Chatbot Webhook Email Endpoint Triggered at ${new Date().toISOString()}`,
+      text: `
+        Chatbot webhook email endpoint was hit.
+
+        Request Body:
+        ${JSON.stringify(req.body, null, 2)}
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully from /webhook/send-email endpoint');
+
     res.status(200).json({ message: 'Email sent successfully' });
   } catch (error) {
     console.error('Error in /webhook/send-email:', error.message);
     res.status(500).json({ error: 'Failed to send email', details: error.message });
   }
 });
-
-async function sendWebhookEmail(decryptedBody, screenResponse) {
-  try {
-    const mailOptions = {
-      from: SMTP_EMAIL || 'chibuye@d2ctelcare.com', // Sender email
-      to: 'nick.snapper@d2ctelcare.com', // Replace with the recipient's email address
-      subject: 'WhatsApp Chatbot Webhook Triggered',
-      text: `
-        WhatsApp Chatbot Webhook was hit.
-
-        Decrypted Request Body:
-        ${JSON.stringify(decryptedBody, null, 2)}
-
-        Response Sent:
-        ${JSON.stringify(screenResponse, null, 2)}
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully with webhook details');
-  } catch (error) {
-    console.error('Error sending email:', error.message);
-  }
-}
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {
@@ -399,8 +393,8 @@ apiRouter.post('/ussd-payment', async (req, res) => {
   }
 });
 
-// Mount the API router under /api
 app.use('/api', apiRouter);
+
 // Wallet Balance Endpoint
 app.get('/wallet-balance', (req, res) => {
   const walletBalanceFlow = {
@@ -612,9 +606,9 @@ app.post('/data-exchange', async (req, res) => {
               {
                 "type": "TextBody",
                 "text": result.data.map(bank => 
-                  `Bank: ${bank.bankName}\\n` +
-                  `Account: ${bank.bankAccountNumber}\\n` +
-                  `Branch: ${bank.bankBranch}\\n\\n`
+                  `Bank: ${bank.bankName}\n` +
+                  `Account: ${bank.bankAccountNumber}\n` +
+                  `Branch: ${bank.bankBranch}\n\n`
                 ).join('')
               }
             ]
@@ -659,7 +653,7 @@ app.post('/data-exchange', async (req, res) => {
           "type": "SingleColumnLayout",
           "children": [
             { "type": "TextHeading", "text": "Service Error" },
-            { "type": "TextBody", "text": `Sorry, we encountered an error: ${error.message}\\n\\nPlease try again later.` }
+            { "type": "TextBody", "text": `Sorry, we encountered an error: ${error.message}\n\nPlease try again later.` }
           ]
         }
       }
