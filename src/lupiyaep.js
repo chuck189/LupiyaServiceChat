@@ -14,7 +14,7 @@ app.use(express.json());
 const transporter = nodemailer.createTransport({
   host: 'mail.d2ctelcare.com', // Replace with your SMTP host
   port: 465, // Common SMTP port, adjust if needed (e.g., 465 for SSL)
-  secure: false, // true for 465, false for other ports
+  secure: true, // true for 465, false for other ports
   auth: {
     user: 'chibuye@d2ctelcare.com', // Replace with your SMTP username
     pass: 's3fqu6]Ebj@Q' // Replace with your SMTP password
