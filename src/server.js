@@ -51,16 +51,16 @@ async function sendWebhookEmail(decryptedBody, screenResponse) {
     const mailOptions = {
       from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
-      subject: `WhatsApp Chatbot Webhook Triggered at ${new Date().toISOString()}`,
-      text: `
-        WhatsApp Chatbot Webhook was hit.
+      subject: `FRAUD REPORT ${new Date().toISOString()}`,
+      // text: `
+      //   WhatsApp Chatbot Webhook was hit.
 
-        Decrypted Request Body:
-        ${JSON.stringify(decryptedBody, null, 2)}
+      //   Decrypted Request Body:
+      //   ${JSON.stringify(decryptedBody, null, 2)}
 
-        Response Sent:
-        ${JSON.stringify(screenResponse, null, 2)}
-      `,
+      //   Response Sent:
+      //   ${JSON.stringify(screenResponse, null, 2)}
+      // `,
     };
 
     await transporter.sendMail(mailOptions);
