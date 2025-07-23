@@ -150,13 +150,7 @@ app.post('/send-email', async (req, res) => {
       to: SMTP_RECIPIENT,
       subject: "FRAUD REPORT",
       text: `
-        A fraud report has been triggered via the chatbot webhook email endpoint.
-        Request received on: ${new Date().toISOString()}
-        Details: 
-        - Screen: ${req.body.screen}
-        - Data: ${JSON.stringify(req.body.data, null, 2)}
-        - Action: ${req.body.action}
-        - Timestamp: ${req.body.timestamp}
+         A fraud report has been filed via the chatbot webhook email endpoint
       `,
     };
 
