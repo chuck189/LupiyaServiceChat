@@ -47,16 +47,15 @@ async function sendWebhookEmail(decryptedBody, screenResponse) {
     throw new Error('SMTP_EMAIL, SMTP_PASSWORD, or SMTP_RECIPIENT is not defined in environment variables');
   }
 
-    try {
+  try {
     const mailOptions = {
-    from: SMTP_EMAIL,
-    to: SMTP_RECIPIENT,
-    subject: "FRAUD REPORT",
-    text: `
-      A fraud report has been triggered via the chatbot webhook email endpoint.
-      Chatbot Message: ${message}  // 'message' is not defined here
-    `,
-  };
+      from: SMTP_EMAIL,
+      to: SMTP_RECIPIENT,
+      subject: `FRAUD REPORT at ${new Date()}`,
+      text: `
+       A fraud report has been filed via the chatbot webhook email endpoint
+      `,
+    };
     await transporter.sendMail(mailOptions);
     console.log('Email sent successfully with webhook details');
   } catch (error) {
@@ -65,39 +64,9 @@ async function sendWebhookEmail(decryptedBody, screenResponse) {
   }
 }
 
-// New endpoint to send email with request body
-app.post("/send-email", async (req, res) => {
-  try {
-    if (!SMTP_RECIPIENT) {
-      throw new Error('SMTP_RECIPIENT is not set in environment variables');
-    }
 
-    // Extract message from request body
-    const { message } = req.body;
-    if (!message) {
-      throw new Error('Message field is required in the request body');
-    }
 
-    // Send email
-   const mailOptions = {
-      from: SMTP_EMAIL,
-      to: SMTP_RECIPIENT,
-      subject: "FRAUD REPORT",
-      text: `
-        A fraud report has been filled via the whatsapp chatbot email endpoint.
-        Chatbot Message: ${message}
-      `,
-    };
-
-   // await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully from /send-email endpoint');
-
-    res.status(200).json({ message: 'Email sent successfully' });
-  } catch (error) {
-    console.error('Error sending email from /send-email:', error.message);
-    res.status(500).json({ error: 'Failed to send email', details: error.message });
-  }
-});
+// ... (rest of the file remains unchanged)
 
 app.post("/", async (req, res) => {
   if (!PRIVATE_KEY) throw new Error('Private key is empty. Please check your env variable "PRIVATE_KEY".');
@@ -119,6 +88,7 @@ app.post("/", async (req, res) => {
   console.log("👉 Response to Encrypt:", screenResponse);
 
   await sendWebhookEmail(decryptedBody, screenResponse);
+  
 
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 });
