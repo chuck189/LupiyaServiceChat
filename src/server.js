@@ -71,17 +71,24 @@ app.post("/send-email", async (req, res) => {
       throw new Error('SMTP_RECIPIENT is not set in environment variables');
     }
 
+    // Extract message from request body
+    const { message } = req.body;
+    if (!message) {
+      throw new Error('Message field is required in the request body');
+    }
+
+    // Send email
    const mailOptions = {
       from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
       subject: "FRAUD REPORT",
       text: `
-        A fraud report has been triggered via the chatbot webhook email endpoint.
+        A fraud report has been filled via the whatsapp chatbot email endpoint.
         Chatbot Message: ${message}
       `,
     };
 
-    await transporter.sendMail(mailOptions);
+   // await transporter.sendMail(mailOptions);
     console.log('Email sent successfully from /send-email endpoint');
 
     res.status(200).json({ message: 'Email sent successfully' });
