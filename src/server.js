@@ -47,15 +47,16 @@ async function sendWebhookEmail(decryptedBody, screenResponse) {
     throw new Error('SMTP_EMAIL, SMTP_PASSWORD, or SMTP_RECIPIENT is not defined in environment variables');
   }
 
-  try {
+    try {
     const mailOptions = {
-      from: SMTP_EMAIL,
-      to: SMTP_RECIPIENT,
-      subject: `FRAUD REPORT at ${new Date()}`,
-      text: `
-       A fraud report has been filed via the chatbot webhook email endpoint
-      `,
-    };
+    from: SMTP_EMAIL,
+    to: SMTP_RECIPIENT,
+    subject: "FRAUD REPORT",
+    text: `
+      A fraud report has been triggered via the chatbot webhook email endpoint.
+      Chatbot Message: ${message}  // 'message' is not defined here
+    `,
+  };
     await transporter.sendMail(mailOptions);
     console.log('Email sent successfully with webhook details');
   } catch (error) {
