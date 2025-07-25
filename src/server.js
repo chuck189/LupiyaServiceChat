@@ -41,7 +41,8 @@ const transporter = nodemailer.createTransport({
 });
 
 // Function to send email with request and response details
-async function sendWebhookEmail(decryptedBody, screenResponse) {
+// Function to send email with chatbot message
+async function sendWebhookEmail(decryptedBody, chatMessage) {
   if (!SMTP_EMAIL || !SMTP_PASSWORD || !SMTP_RECIPIENT) {
     console.error("Missing required SMTP environment variables:", { SMTP_EMAIL, SMTP_PASSWORD, SMTP_RECIPIENT });
     throw new Error('SMTP_EMAIL, SMTP_PASSWORD, or SMTP_RECIPIENT is not defined in environment variables');
@@ -51,9 +52,11 @@ async function sendWebhookEmail(decryptedBody, screenResponse) {
     const mailOptions = {
       from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
-      subject: `FRAUD REPORT at ${new Date()}`,
+      subject: `FRAUD REPORT at ${new Date().toISOString()}`,
       text: `
-       A fraud report has been filed via the chatbot webhook email endpoint
+        A fraud report has been triggered via the chatbot webhook email endpoint.
+        Request received on: ${new Date().toISOString()}
+        Chatbot Message: ${chatMessage}
       `,
     };
     await transporter.sendMail(mailOptions);
@@ -64,10 +67,7 @@ async function sendWebhookEmail(decryptedBody, screenResponse) {
   }
 }
 
-
-
 // ... (rest of the file remains unchanged)
-
 app.post("/", async (req, res) => {
   if (!PRIVATE_KEY) throw new Error('Private key is empty. Please check your env variable "PRIVATE_KEY".');
   if (!isRequestSignatureValid(req)) return res.status(432).send();
@@ -84,11 +84,20 @@ app.post("/", async (req, res) => {
   const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
   console.log("💬 Decrypted Request:", decryptedBody);
 
+  // Determine if this is a ping or a meaningful message
+  const isPing = decryptedBody.action === 'ping';
+  const { message, text } = decryptedBody;
+  const chatMessage = message || text || JSON.stringify(decryptedBody); // Fallback to full body
+
+  if (!isPing && chatMessage) {
+    console.log("📧 Sending email for message:", chatMessage);
+    await sendWebhookEmail(decryptedBody, chatMessage); // Pass chatMessage instead of screenResponse
+  } else {
+    console.log("⏭️ Skipping email: Ping or no message detected");
+  }
+
   const screenResponse = await getNextScreen(decryptedBody);
   console.log("👉 Response to Encrypt:", screenResponse);
-
-  await sendWebhookEmail(decryptedBody, screenResponse);
-  
 
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 });
