@@ -2,6 +2,8 @@
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import express from 'express'; // Use ESM import
+import fs from 'fs'; // Import fs explicitly
+import path from 'path'; // Import path explicitly
 const app = express();
 
 const LUPIYA_CONFIG = {
@@ -90,6 +92,17 @@ function scheduleTokenRenewal() {
       await renewToken();
     }
   }, 23 * 60 * 60 * 1000); // Run every 23 hours
+}
+
+// Start scheduling on app startup
+scheduleTokenRenewal();
+
+// Update getAccessToken to use the managed token
+async function getAccessToken() {
+  if (!currentToken || (tokenExpiry && tokenExpiry <= new Date())) {
+    await renewToken();
+  }
+  return currentToken;
 }
 
 // Function to authenticate and get a new token
