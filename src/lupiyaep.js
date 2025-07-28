@@ -106,13 +106,13 @@ async function getAccessToken() {
 }
 
 // Function to authenticate and get a new token
-async function getAccessToken() {
-  const token = process.env.LUPIYA_ACCESS_TOKEN;
-  if (!token) {
-    throw new Error('accessToken is not defined in environment variables');
-  }
-  return token;
-}
+// async function getAccessToken() {
+//   const token = process.env.LUPIYA_ACCESS_TOKEN;
+//   if (!token) {
+//     throw new Error('accessToken is not defined in environment variables');
+//   }
+//   return token;
+// }
 
 // Lupiya service functions
 class LupiyaService {
