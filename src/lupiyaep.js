@@ -11,6 +11,7 @@ const LUPIYA_CONFIG = {
 export { app as default, LupiyaService };
 app.use(express.json());
 
+const TOKEN_FILE = path.join('/tmp', 'lupiya_token.json');
 const { SMTP_EMAIL, SMTP_PASSWORD, SMTP_RECIPIENT, SMTP_HOST = "mail.d2ctelcare.com", SMTP_PORT = "465" } = process.env;
 
 // Log environment variables for debugging
@@ -26,6 +27,70 @@ const transporter = nodemailer.createTransport({
     pass: SMTP_PASSWORD
   }
 });
+
+//Function to authenticate and get a new token
+// Load or initialize token
+let currentToken = null;
+let tokenExpiry = null;
+function loadToken() {
+  try {
+    if (fs.existsSync(TOKEN_FILE)) {
+      const data = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+      currentToken = data.token;
+      tokenExpiry = new Date(data.created); // Use created timestamp
+      tokenExpiry.setSeconds(tokenExpiry.getSeconds() + data.ttl); // Add TTL (86400 seconds)
+      console.log("Loaded token, expires at:", tokenExpiry);
+    } else if (process.env.LUPIYA_ACCESS_TOKEN) {
+      currentToken = process.env.LUPIYA_ACCESS_TOKEN;
+      tokenExpiry = new Date(); // Assume current time as base
+      tokenExpiry.setSeconds(tokenExpiry.getSeconds() + 86400); // Set 24-hour expiry
+      saveToken(currentToken, tokenExpiry);
+      console.log("Initialized token from env, expires at:", tokenExpiry);
+    } else {
+      console.error("No token available, triggering renewal...");
+      renewToken();
+    }
+  } catch (error) {
+    console.error("Error loading token:", error.message);
+    renewToken();
+  }
+}
+
+// Save token to file with metadata
+function saveToken(token, expiry, created = new Date().toISOString(), ttl = 86400) {
+  fs.writeFileSync(TOKEN_FILE, JSON.stringify({ token, expiry: expiry.toISOString(), created, ttl }), 'utf8');
+}
+
+// Renew token function based on Lupiya API
+async function renewToken() {
+  try {
+    const credentials = {
+      email: "whatsapp-chatbot-service-account@lupiya.com",
+      password: "Is%2&tcFh2PvI3lG"
+    };
+    const response = await axios.post(`${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/token`, credentials, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    currentToken = response.data.token;
+    tokenExpiry = new Date(response.data.created);
+    tokenExpiry.setSeconds(tokenExpiry.getSeconds() + response.data.ttl);
+    saveToken(currentToken, tokenExpiry, response.data.created, response.data.ttl);
+    console.log("Token renewed, expires at:", tokenExpiry);
+  } catch (error) {
+    console.error("Error renewing token:", error.message, error.response?.data);
+    throw new Error('Token renewal failed');
+  }
+}
+
+// Schedule token renewal every 23 hours
+function scheduleTokenRenewal() {
+  loadToken();
+  setInterval(async () => {
+    if (tokenExpiry && tokenExpiry <= new Date(Date.now() + 60 * 60 * 1000)) { // Renew if within 1 hour of expiry
+      await renewToken();
+    }
+  }, 23 * 60 * 60 * 1000); // Run every 23 hours
+}
 
 // Function to authenticate and get a new token
 async function getAccessToken() {
@@ -58,6 +123,8 @@ class LupiyaService {
     }
   }
 
+
+
   static async getWalletBalance(idNumber) {
     try {
       const token = await getAccessToken();
@@ -78,6 +145,7 @@ class LupiyaService {
     }
   }
 
+ 
   static async getBankDetails() {
     try {
       const token = await getAccessToken();
