@@ -143,8 +143,7 @@ apiRouter.get('/bank-details', async (req, res) => {
       ).join('');
     res.json({
       success: true,
-      message,
-      data: result.data
+       message: message.trim(),
     });
   } catch (error) {
     res.status(500).json({
