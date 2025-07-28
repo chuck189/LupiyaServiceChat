@@ -438,7 +438,7 @@ apiRouter.get('/bank-details', async (req, res) => {
     res.json({
       success: true,
       message: message.trim(), //Remove trailing newline
-      data: result.data
+    //  data: result.data
     });
   } catch (error) {
     res.status(500).json({
