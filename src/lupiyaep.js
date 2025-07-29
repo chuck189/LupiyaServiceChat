@@ -110,24 +110,19 @@ class LupiyaService {
   static async getLoanStatement(idNumber) {
     try {
       const token = await getAccessToken();
+      console.log("Sending loan statement request with token:", token.substring(0, 10) + "..."); // Log partial token
       const response = await axios.post(
         `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-statement`,
         { idNumber },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': token,
-          },
-        }
+        { headers: { 'Content-Type': 'application/json', 'access_token': token } }
       );
+      console.log("Loan Statement API Response:", response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching loan statement:', error.message);
+      console.error("Error fetching loan statement:", error.message, error.response?.status, error.response?.data);
       throw new Error('Failed to fetch loan statement');
     }
   }
-
-
 
   static async getWalletBalance(idNumber) {
     try {
@@ -303,7 +298,7 @@ apiRouter.get('/loan-statement/:nrc', async (req, res) => {
 // Loan Statement POST
 apiRouter.post('/loan-statement', async (req, res) => {
   try {
-    console.log("Received loan-statement request:", req.body); // Log incoming request
+    console.log("Received loan-statement request:", req.body);
     const { nrc } = req.body;
     if (!nrc) {
       console.log("Missing NRC in request body");
@@ -314,15 +309,15 @@ apiRouter.post('/loan-statement', async (req, res) => {
     }
     console.log("Processing loan statement for NRC:", nrc);
     const result = await LupiyaService.getLoanStatement(nrc);
-    console.log("Loan Statement Result:", result); // Log full result for debugging
+    console.log("Loan Statement Result:", result);
     let message = `📊 *Loan Statement for ${nrc}*\n\n`;
     let statementItems = [];
     if (Array.isArray(result.data)) {
       statementItems = result.data;
     } else if (result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
-      statementItems = [result.data]; // Treat as single item if object
+      statementItems = [result.data];
     } else {
-      statementItems = []; // Default to empty array if undefined or invalid
+      statementItems = [];
       message += 'No loan statement data available.';
     }
     if (statementItems.length > 0) {
