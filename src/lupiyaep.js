@@ -70,6 +70,7 @@ async function renewToken() {
       email: "whatsapp-chatbot-service-account@lupiya.com",
       password: "Is%2&tcFh2PvI3lG"
     };
+    console.log("Attempting token renewal with credentials:", { email: credentials.email.substring(0, 5) + "...", password: "****" });
     const response = await axios.post(`${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/token`, credentials, {
       headers: { 'Content-Type': 'application/json' }
     });
