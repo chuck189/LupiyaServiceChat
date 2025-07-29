@@ -303,27 +303,43 @@ apiRouter.get('/loan-statement/:nrc', async (req, res) => {
 // Loan Statement POST
 apiRouter.post('/loan-statement', async (req, res) => {
   try {
+    console.log("Received loan-statement request:", req.body); // Log incoming request
     const { nrc } = req.body;
     if (!nrc) {
+      console.log("Missing NRC in request body");
       return res.status(400).json({
         success: false,
         message: '❌ NRC number is required'
       });
     }
+    console.log("Processing loan statement for NRC:", nrc);
     const result = await LupiyaService.getLoanStatement(nrc);
-    const message = `📊 *Loan Statement for ${nrc}*\n\n` + 
-      result.data.map(item => 
+    console.log("Loan Statement Result:", result); // Log full result for debugging
+    let message = `📊 *Loan Statement for ${nrc}*\n\n`;
+    let statementItems = [];
+    if (Array.isArray(result.data)) {
+      statementItems = result.data;
+    } else if (result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
+      statementItems = [result.data]; // Treat as single item if object
+    } else {
+      statementItems = []; // Default to empty array if undefined or invalid
+      message += 'No loan statement data available.';
+    }
+    if (statementItems.length > 0) {
+      message += statementItems.map(item => 
         `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\n` +
-        `Type: ${item.type}\n` +
-        `Amount: ZMW ${Number(item.amountPaid).toFixed(2)}\n` +
-        `Balance: ZMW ${Number(item.loanBalance).toFixed(2)}\n`
+        `Type: ${item.type || 'N/A'}\n` +
+        `Amount: ZMW ${Number(item.amountPaid || 0).toFixed(2)}\n` +
+        `Balance: ZMW ${Number(item.loanBalance || 0).toFixed(2)}\n`
       ).join('\n---\n\n');
+    }
     res.json({
       success: true,
-      message,
-      data: result.data
+      message: message.trim(),
+      data: statementItems
     });
   } catch (error) {
+    console.error("Error in /loan-statement:", error.message);
     res.status(500).json({
       success: false,
       message: `❌ Error: ${error.message}`
