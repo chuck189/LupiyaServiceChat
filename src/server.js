@@ -245,7 +245,7 @@ apiRouter.post('/loan-statement', async (req, res) => {
       });
     }
     const result = await LupiyaService.getLoanStatement(nrc);
-    const message = `📊 *Loan Statement for ${nrc}*\n\n` +
+    const message = `📊 *Loan Statement for ${nrc}*\n\n` + 
       result.data.map(item => 
         `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\n` +
         `Type: ${item.type}\n` +
