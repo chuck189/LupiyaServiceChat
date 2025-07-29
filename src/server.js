@@ -133,19 +133,22 @@ const apiRouter = express.Router();
 apiRouter.get('/bank-details', async (req, res) => {
   try {
     const result = await LupiyaService.getBankDetails();
-    const accountName = result.data[0].accountName;
-    const message = `🏦 *Bank Repayment Details for ${accountName}*\n\n` +
-      result.data.map(bank => 
-        `💳 *${bank.bankName}*\n` +
-        `  - Account Number: ${bank.bankAccountNumber}\n` +
-        `  - Branch: ${bank.bankBranch}\n` +
-        `  - Branch Code: ${bank.branchCode || 'Not available'}\n\n`
-      ).join('');
+    const accountName = result.data[0]?.accountName || 'Unknown Account';
+    let message = `🏦 *Bank Repayment Details for ${accountName}*\n\n`;
+    const bankDetails = result.data.map(bank => 
+      `💳 *${bank.bankName}*\n` +
+      `  - Account Number: ${bank.bankAccountNumber}\n` +
+      `  - Branch: ${bank.bankBranch}\n` +
+      `  - Branch Code: ${bank.branchCode || 'Not available'}\n\n`
+    ).join('');
+    message += bankDetails || 'No bank details available.';
+    console.log("Bank Details Message:", message); // Log the full message
     res.json({
       success: true,
-       message: message.trim(),
+      message: message.trim(),
     });
   } catch (error) {
+    console.error("Error in /bank-details:", error.message);
     res.status(500).json({
       success: false,
       message: `❌ Error: ${error.message}`
