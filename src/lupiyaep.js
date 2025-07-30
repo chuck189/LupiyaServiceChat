@@ -76,10 +76,17 @@ async function renewToken() {
       credentials,
       { headers: { 'Content-Type': 'application/json' } }
     );
-    currentToken = response.data.token;
-    tokenExpiry = new Date(response.data.created);
-    tokenExpiry.setSeconds(tokenExpiry.getSeconds() + response.data.ttl);
-    saveToken(currentToken, tokenExpiry, response.data.created, response.data.ttl);
+    console.log("Token API Response:", response.data); // Log full response
+    const token = response.data.token || response.data.access_token || response.data.jwt;
+    if (!token) {
+      throw new Error("No valid token found in API response");
+    }
+    const created = response.data.created || new Date().toISOString();
+    const ttl = response.data.ttl || 86400; // Default to 24 hours if ttl is missing
+    currentToken = token;
+    tokenExpiry = new Date(created);
+    tokenExpiry.setSeconds(tokenExpiry.getSeconds() + ttl);
+    saveToken(currentToken, tokenExpiry, created, ttl);
     console.log("Token renewed successfully, expires at:", tokenExpiry);
   } catch (error) {
     console.error("Token renewal failed:", {
