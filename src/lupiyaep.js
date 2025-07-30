@@ -70,7 +70,7 @@ async function renewToken() {
       email: process.env.LUPIYA_EMAIL || "whatsapp-chatbot-service-account@lupiya.com",
       password: process.env.LUPIYA_PASSWORD || "Is%2&tcFh2PvI3lG"
     };
-    console.log("Attempting token renewal...");
+    console.log("Attempting token renewal with email:", credentials.email);
     const response = await axios.post(
       `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/token`,
       credentials,
@@ -105,9 +105,9 @@ function scheduleTokenRenewal() {
 scheduleTokenRenewal();
 
 // Update getAccessToken to use the managed token
-async function getAccessToken() {
-  if (!currentToken || (tokenExpiry && tokenExpiry <= new Date())) {
-    console.log("Token missing or expired, renewing...");
+async function getAccessToken(forceRenew = false) {
+  if (forceRenew || !currentToken || (tokenExpiry && tokenExpiry <= new Date())) {
+    console.log("Token missing, expired, or forced renewal, renewing...");
     await renewToken();
   }
   if (!currentToken) {
@@ -127,13 +127,38 @@ class LupiyaService {
       {
         headers: {
           'Content-Type': 'application/json',
-            'access_token': token // Use the managed token
+          'Authorization': `Bearer ${token}`
         }
       }
     );
     console.log("Loan Statement API Response:", response.data);
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      console.log("Received 401, forcing token renewal...");
+      const token = await getAccessToken(true); // Force renewal
+      try {
+        const response = await axios.post(
+          `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-statement`,
+          { idNumber },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        console.log("Loan Statement API Response after retry:", response.data);
+        return response.data;
+      } catch (retryError) {
+        console.error("Retry failed:", {
+          message: retryError.message,
+          status: retryError.response?.status,
+          data: retryError.response?.data
+        });
+        throw new Error('Failed to fetch loan statement after retry');
+      }
+    }
     console.error("Error fetching loan statement:", {
       message: error.message,
       status: error.response?.status,

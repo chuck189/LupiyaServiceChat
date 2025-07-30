@@ -237,7 +237,7 @@ apiRouter.post('/loan-statement/:nrc', async (req, res) => {
 // Loan Statement POST
 apiRouter.post('/loan-statement', async (req, res) => {
   try {
-    console.log("Received loan-statement request:", req.body); // Log incoming request
+    console.log("Received loan-statement request:", req.body);
     const { nrc } = req.body;
     if (!nrc) {
       console.log("Missing NRC in request body");
@@ -248,24 +248,24 @@ apiRouter.post('/loan-statement', async (req, res) => {
     }
     console.log("Processing loan statement for NRC:", nrc);
     const result = await LupiyaService.getLoanStatement(nrc);
-    console.log("Loan Statement Result:", result); // Log full result for debugging
+    console.log("Loan Statement Result:", result);
     let message = `📊 *Loan Statement for ${nrc}*\n\n`;
     let statementItems = [];
     if (Array.isArray(result.data)) {
       statementItems = result.data;
     } else if (result.data && typeof result.data === 'object') {
-      statementItems = [result.data]; // Treat as single item if object
+      statementItems = [result.data];
     } else {
-      statementItems = []; // Default to empty array if undefined or invalid
+      statementItems = [];
     }
     if (statementItems.length === 0) {
       message += 'No loan statement data available.';
     } else {
-      message += statementItems.map(item => 
-        `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\n` +
-        `Type: ${item.type}\n` +
-        `Amount: ZMW ${Number(item.amountPaid || 0).toFixed(2)}\n` +
-        `Balance: ZMW ${Number(item.loanBalance || 0).toFixed(2)}\n`
+      message += statementItems.map(item =>
+        `Date: ${new Date(item.loanStartDate).toLocaleDateString()}\n` +
+        `Type: ${item.loanType || 'N/A'}\n` +
+        `Amount Paid: ZMW ${Number(item.totalPaymentsMade || 0).toFixed(2)}\n` +
+        `Balance: ZMW ${Number(item.outstandingBalance || 0).toFixed(2)}\n`
       ).join('\n---\n\n');
     }
     res.json({
