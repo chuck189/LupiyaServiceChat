@@ -67,20 +67,26 @@ function saveToken(token, expiry, created = new Date().toISOString(), ttl = 8640
 async function renewToken() {
   try {
     const credentials = {
-      email: "whatsapp-chatbot-service-account@lupiya.com",
-      password: "Is%2&tcFh2PvI3lG"
+      email: process.env.LUPIYA_EMAIL || "whatsapp-chatbot-service-account@lupiya.com",
+      password: process.env.LUPIYA_PASSWORD || "Is%2&tcFh2PvI3lG"
     };
-    console.log("Attempting token renewal with credentials:", { email: credentials.email.substring(0, 5) + "...", password: "****" });
-    const response = await axios.post(`${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/token`, credentials, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.log("Attempting token renewal...");
+    const response = await axios.post(
+      `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/token`,
+      credentials,
+      { headers: { 'Content-Type': 'application/json' } }
+    );
     currentToken = response.data.token;
     tokenExpiry = new Date(response.data.created);
     tokenExpiry.setSeconds(tokenExpiry.getSeconds() + response.data.ttl);
     saveToken(currentToken, tokenExpiry, response.data.created, response.data.ttl);
-    console.log("Token renewed, expires at:", tokenExpiry);
+    console.log("Token renewed successfully, expires at:", tokenExpiry);
   } catch (error) {
-    console.error("Error renewing token:", error.message, error.response?.data);
+    console.error("Token renewal failed:", {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
     throw new Error('Token renewal failed');
   }
 }
@@ -101,27 +107,58 @@ scheduleTokenRenewal();
 // Update getAccessToken to use the managed token
 async function getAccessToken() {
   if (!currentToken || (tokenExpiry && tokenExpiry <= new Date())) {
+    console.log("Token missing or expired, renewing...");
     await renewToken();
+  }
+  if (!currentToken) {
+    throw new Error("No valid token available after renewal attempt");
   }
   return currentToken;
 }
-
 // Lupiya service functions
 class LupiyaService {
-  static async getLoanStatement(idNumber) {
+ static async getLoanStatement(idNumber) {
+  try {
+    const token = await getAccessToken();
+    console.log("Sending loan statement request with token:", token.substring(0, 10) + "...");
+    const response = await axios.post(
+      `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-statement`,
+      { idNumber },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+            'access_token': token // Use the managed token
+        }
+      }
+    );
+    console.log("Loan Statement API Response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching loan statement:", {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+    throw new Error('Failed to fetch loan statement');
+  }
+}
+
+static async getBankDetails() {
     try {
       const token = await getAccessToken();
-      console.log("Sending loan statement request with token:", token.substring(0, 10) + "..."); // Log partial token
-      const response = await axios.post(
-        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-statement`,
-        { idNumber },
-        { headers: { 'Content-Type': 'application/json', 'access_token': token } }
+      const response = await axios.get(
+        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': token
+          }
+        }
       );
-      console.log("Loan Statement API Response:", response.data);
       return response.data;
     } catch (error) {
-      console.error("Error fetching loan statement:", error.message, error.response?.status, error.response?.data);
-      throw new Error('Failed to fetch loan statement');
+      console.error('Error fetching bank details:', error.message);
+      throw new Error('Failed to fetch bank details');
     }
   }
 
@@ -142,26 +179,6 @@ class LupiyaService {
     } catch (error) {
       console.error('Error fetching wallet balance:', error.message);
       throw new Error('Failed to fetch wallet balance');
-    }
-  }
-
- 
-  static async getBankDetails() {
-    try {
-      const token = await getAccessToken();
-      const response = await axios.get(
-        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': token
-          }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching bank details:', error.message);
-      throw new Error('Failed to fetch bank details');
     }
   }
 
