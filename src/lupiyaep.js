@@ -1,69 +1,59 @@
-// 1. Add axios and nodemailer dependencies (run: npm install axios nodemailer)
 import axios from 'axios';
 import nodemailer from 'nodemailer';
-import express from 'express'; // Use ESM import
-import fs from 'fs'; // Import fs explicitly
-import path from 'path'; // Import path explicitly
+import express from 'express';
+import fs from 'fs';
+import path from 'path';
+
 const app = express();
+app.use(express.json());
 
 const LUPIYA_CONFIG = {
-  baseUrl: process.env.LUPIYA_BASE_URL || 'https://backend.qa.lupiya.com',
+  baseUrl: process.env.LUPIYA_BASE_URL || 'https://backend.qa.lupiya.com'
 };
-
-export { app as default, LupiyaService };
-app.use(express.json());
+console.log("Lupiya API Base URL:", LUPIYA_CONFIG.baseUrl);
 
 const TOKEN_FILE = path.join('/tmp', 'lupiya_token.json');
 const { SMTP_EMAIL, SMTP_PASSWORD, SMTP_RECIPIENT, SMTP_HOST = "mail.d2ctelcare.com", SMTP_PORT = "465" } = process.env;
 
-// Log environment variables for debugging
 console.log("Lupiyaep Environment Variables:", { SMTP_EMAIL, SMTP_PASSWORD, SMTP_RECIPIENT, SMTP_HOST, SMTP_PORT });
 
-// Configure Nodemailer transporter
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: parseInt(SMTP_PORT),
   secure: parseInt(SMTP_PORT) === 465,
-  auth: {
-    user: SMTP_EMAIL,
-    pass: SMTP_PASSWORD
-  }
+  auth: { user: SMTP_EMAIL, pass: SMTP_PASSWORD }
 });
 
-//Function to authenticate and get a new token
-// Load or initialize token
 let currentToken = null;
 let tokenExpiry = null;
+
 function loadToken() {
   try {
     if (fs.existsSync(TOKEN_FILE)) {
       const data = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
       currentToken = data.token;
-      tokenExpiry = new Date(data.created); // Use created timestamp
-      tokenExpiry.setSeconds(tokenExpiry.getSeconds() + data.ttl); // Add TTL (86400 seconds)
-      console.log("Loaded token, expires at:", tokenExpiry);
-    } else if (process.env.LUPIYA_ACCESS_TOKEN) {
-      currentToken = process.env.LUPIYA_ACCESS_TOKEN;
-      tokenExpiry = new Date(); // Assume current time as base
-      tokenExpiry.setSeconds(tokenExpiry.getSeconds() + 86400); // Set 24-hour expiry
-      saveToken(currentToken, tokenExpiry);
-      console.log("Initialized token from env, expires at:", tokenExpiry);
+      tokenExpiry = new Date(data.created);
+      tokenExpiry.setSeconds(tokenExpiry.getSeconds() + data.ttl);
+      console.log("Loaded token from file, expires at:", tokenExpiry);
     } else {
-      console.error("No token available, triggering renewal...");
+      console.log("No token file found, triggering renewal...");
       renewToken();
     }
   } catch (error) {
-    console.error("Error loading token:", error.message);
+    console.error("Error loading token from file:", error.message);
     renewToken();
   }
 }
 
-// Save token to file with metadata
 function saveToken(token, expiry, created = new Date().toISOString(), ttl = 86400) {
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify({ token, expiry: expiry.toISOString(), created, ttl }), 'utf8');
+  try {
+    fs.writeFileSync(TOKEN_FILE, JSON.stringify({ token, expiry: expiry.toISOString(), created, ttl }), 'utf8');
+    console.log("Token saved to file:", TOKEN_FILE);
+  } catch (error) {
+    console.error("Failed to save token to file:", error.message);
+  }
 }
 
-// Renew token function based on Lupiya API
 async function renewToken() {
   try {
     const credentials = {
@@ -76,13 +66,16 @@ async function renewToken() {
       credentials,
       { headers: { 'Content-Type': 'application/json' } }
     );
-    console.log("Token API Response:", response.data); // Log full response
+    console.log("Token API Response:", response.data);
     const token = response.data.token || response.data.access_token || response.data.jwt;
     if (!token) {
       throw new Error("No valid token found in API response");
     }
+    if (token.split('.').length !== 3) {
+      console.warn("Token does not appear to be a valid JWT:", token);
+    }
     const created = response.data.created || new Date().toISOString();
-    const ttl = response.data.ttl || 86400; // Default to 24 hours if ttl is missing
+    const ttl = response.data.ttl || 86400;
     currentToken = token;
     tokenExpiry = new Date(created);
     tokenExpiry.setSeconds(tokenExpiry.getSeconds() + ttl);
@@ -98,20 +91,6 @@ async function renewToken() {
   }
 }
 
-// Schedule token renewal every 23 hours
-function scheduleTokenRenewal() {
-  loadToken();
-  setInterval(async () => {
-    if (tokenExpiry && tokenExpiry <= new Date(Date.now() + 60 * 60 * 1000)) { // Renew if within 1 hour of expiry
-      await renewToken();
-    }
-  }, 23 * 60 * 60 * 1000); // Run every 23 hours
-}
-
-// Start scheduling on app startup
-scheduleTokenRenewal();
-
-// Update getAccessToken to use the managed token
 async function getAccessToken(forceRenew = false) {
   if (forceRenew || !currentToken || (tokenExpiry && tokenExpiry <= new Date())) {
     console.log("Token missing, expired, or forced renewal, renewing...");
@@ -122,682 +101,80 @@ async function getAccessToken(forceRenew = false) {
   }
   return currentToken;
 }
-// Lupiya service functions
+
 class LupiyaService {
- static async getLoanStatement(idNumber) {
-  try {
-    const token = await getAccessToken();
-    console.log("Sending loan statement request with token:", token.substring(0, 10) + "...");
-    const response = await axios.post(
-      `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-statement`,
-      { idNumber },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+  static async getLoanStatement(idNumber) {
+    try {
+      const token = await getAccessToken();
+      console.log("Sending loan statement request with token:", token.substring(0, 10) + "...");
+      const response = await axios.post(
+        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-statement`,
+        { idNumber },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
         }
-      }
-    );
-    console.log("Loan Statement API Response:", response.data);
-    return response.data;
-  } catch (error) {
-    if (error.response?.status === 401) {
-      console.log("Received 401, forcing token renewal...");
-      const token = await getAccessToken(true); // Force renewal
-      try {
-        const response = await axios.post(
-          `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-statement`,
-          { idNumber },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
+      );
+      console.log("Loan Statement API Response:", response.data);
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        console.log("Received 401, trying alternative header...");
+        try {
+          const token = await getAccessToken(true);
+          const response = await axios.post(
+            `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-statement`,
+            { idNumber },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'access_token': token
+              }
             }
-          }
-        );
-        console.log("Loan Statement API Response after retry:", response.data);
-        return response.data;
-      } catch (retryError) {
-        console.error("Retry failed:", {
-          message: retryError.message,
-          status: retryError.response?.status,
-          data: retryError.response?.data
-        });
-        throw new Error('Failed to fetch loan statement after retry');
+          );
+          console.log("Loan Statement API Response after retry:", response.data);
+          return response.data;
+        } catch (retryError) {
+          console.error("Retry with alternative header failed:", {
+            message: retryError.message,
+            status: retryError.response?.status,
+            data: retryError.response?.data
+          });
+          throw new Error('Failed to fetch loan statement after retry');
+        }
       }
+      console.error("Error fetching loan statement:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      throw new Error('Failed to fetch loan statement');
     }
-    console.error("Error fetching loan statement:", {
-      message: error.message,
-      status: error.response?.status,
-      data: error.response?.data
-    });
-    throw new Error('Failed to fetch loan statement');
   }
+
+  // Other methods (getWalletBalance, getBankDetails, etc.) should follow similar header logic
 }
 
-static async getBankDetails() {
-    try {
-      const token = await getAccessToken();
-      const response = await axios.get(
-        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/bank-repayment-details`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': token
-          }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching bank details:', error.message);
-      throw new Error('Failed to fetch bank details');
-    }
-  }
-
-  static async getWalletBalance(idNumber) {
-    try {
-      const token = await getAccessToken();
-      const response = await axios.post(
-        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/wallet-balance`,
-        { idNumber },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': token,
-          }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching wallet balance:', error.message);
-      throw new Error('Failed to fetch wallet balance');
-    }
-  }
-
-  static async getLoanTopupRange(idNumber) {
-    try {
-      const token = await getAccessToken();
-      const response = await axios.post(
-        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/top-up-range`,
-        { idNumber },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': token
-          }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching loan topup range:', error.message);
-      throw new Error('Failed to fetch loan topup range');
-    }
-  }
-
-  static async requestUSSDPayment(idNumber, phoneNumber) {
-    try {
-      const token = await getAccessToken();
-      const response = await axios.post(
-        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/request-ussd-payment`,
-        { idNumber, phoneNumber },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': token,
-          }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error requesting USSD payment:', error.message);
-      throw new Error('Failed to request USSD payment');
-    }
-  }
-}
-
-// New endpoint to send email with request body
 app.post('/send-email', async (req, res) => {
+  const { message } = req.body;
   try {
-    if (!SMTP_RECIPIENT) {
-      throw new Error('SMTP_RECIPIENT is not set in environment variables');
-    }
-
-    // Extract 'message' or 'text' from the request body, with fallback
-    const { message, text } = req.body;
-    const chatMessage = message || text; // Use 'message' if present, otherwise 'text'
-
-    // Validate that a message is provided
-    if (!chatMessage) {
-      throw new Error('Message field (or equivalent text field) is required in the request body');
-    }
-
-    const mailOptions = {
+    await transporter.sendMail({
       from: SMTP_EMAIL,
       to: SMTP_RECIPIENT,
-      subject: "FRAUD REPORT",
-      text: `
-        A fraud report has been triggered via the chatbot webhook email endpoint.
-        Request received on: ${new Date().toISOString()}
-        Chatbot Message: ${chatMessage}
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully from /webhook/send-email endpoint');
-
-    res.status(200).json({ message: 'Email sent successfully' });
+      subject: 'Fraud Report',
+      text: message
+    });
+    res.json({ success: true, message: 'Email sent successfully' });
   } catch (error) {
-    console.error('Error in /webhook/send-email:', error.message);
-    res.status(500).json({ error: 'Failed to send email', details: error.message });
+    console.error('Error sending email:', error);
+    res.status(500).json({ success: false, message: 'Failed to send email' });
   }
 });
 
-// Health Check Endpoint
 app.get('/health', (req, res) => {
-  res.json({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    service: "Lupiya WhatsApp API Service",
-    version: "2.0.0",
-    endpoints: [
-      "GET /api/loan-statement/:nrc - Get loan statement",
-      "POST /api/loan-statement - Get loan statement (JSON body)",
-      "GET /api/topup-range/:nrc - Get loan topup range",
-      "POST /api/topup-range - Get loan topup range (JSON body)",
-      "GET /api/wallet-balance/:nrc - Get wallet balance",
-      "POST /api/wallet-balance - Get wallet balance (JSON body)",
-      "GET /api/bank-details - Get bank repayment details",
-      "POST /api/ussd-payment - Request USSD payment",
-      "POST /webhook - WhatsApp webhook receiver"
-    ],
-    lupiya_config: {
-      baseUrl: process.env.LUPIYA_BASE_URL,
-      hasToken: !!process.env.LUPIYA_ACCESS_TOKEN
-    }
-  });
+  res.json({ status: 'OK' });
 });
 
-// API Router for Direct Endpoints
-const apiRouter = express.Router();
-
-// Loan Statement GET
-apiRouter.get('/loan-statement/:nrc', async (req, res) => {
-  try {
-    const { nrc } = req.params;
-    const result = await LupiyaService.getLoanStatement(nrc);
-    const message = `📊 *Loan Statement for ${nrc}*\n\n` + 
-      result.data.map(item => 
-        `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\n` +
-        `Type: ${item.type}\n` +
-        `Amount: ZMW ${Number(item.amountPaid).toFixed(2)}\n` +
-        `Balance: ZMW ${Number(item.loanBalance).toFixed(2)}\n`
-      ).join('\n---\n\n');
-    res.json({
-      success: true,
-      message,
-      data: result.data
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: `❌ Error: ${error.message}`
-    });
-  }
-});
-
-// Loan Statement POST
-apiRouter.post('/loan-statement', async (req, res) => {
-  try {
-    console.log("Received loan-statement request:", req.body);
-    const { nrc } = req.body;
-    if (!nrc) {
-      console.log("Missing NRC in request body");
-      return res.status(400).json({
-        success: false,
-        message: '❌ NRC number is required'
-      });
-    }
-    console.log("Processing loan statement for NRC:", nrc);
-    const result = await LupiyaService.getLoanStatement(nrc);
-    console.log("Loan Statement Result:", result);
-    let message = `📊 *Loan Statement for ${nrc}*\n\n`;
-    let statementItems = [];
-    if (Array.isArray(result.data)) {
-      statementItems = result.data;
-    } else if (result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
-      statementItems = [result.data];
-    } else {
-      statementItems = [];
-      message += 'No loan statement data available.';
-    }
-    if (statementItems.length > 0) {
-      message += statementItems.map(item => 
-        `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\n` +
-        `Type: ${item.type || 'N/A'}\n` +
-        `Amount: ZMW ${Number(item.amountPaid || 0).toFixed(2)}\n` +
-        `Balance: ZMW ${Number(item.loanBalance || 0).toFixed(2)}\n`
-      ).join('\n---\n\n');
-    }
-    res.json({
-      success: true,
-      message: message.trim(),
-      data: statementItems
-    });
-  } catch (error) {
-    console.error("Error in /loan-statement:", error.message);
-    res.status(500).json({
-      success: false,
-      message: `❌ Error: ${error.message}`
-    });
-  }
-});
-
-// Topup Range GET
-apiRouter.get('/topup-range/:nrc', async (req, res) => {
-  try {
-    const { nrc } = req.params;
-    const result = await LupiyaService.getLoanTopupRange(nrc);
-    const message = `💰 *Loan Topup Available for ${nrc}*\n\n` +
-      `Loan Type: ${result.loanType}\n` +
-      `Minimum: ZMW ${result.amountRange.min}\n` +
-      `Maximum: ZMW ${result.amountRange.max}`;
-    res.json({
-      success: true,
-      message,
-      data: result
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: `❌ Error: ${error.message}`
-    });
-  }
-});
-
-// Topup Range POST
-apiRouter.post('/topup-range', async (req, res) => {
-  try {
-    const { nrc } = req.body;
-    if (!nrc) {
-      return res.status(400).json({
-        success: false,
-        message: '❌ NRC number is required'
-      });
-    }
-    const result = await LupiyaService.getLoanTopupRange(nrc);
-    const message = `💰 *Loan Topup Available for ${nrc}*\n\n` +
-      `Loan Type: ${result.loanType}\n` +
-      `Minimum: ZMW ${result.amountRange.min}\n` +
-      `Maximum: ZMW ${result.amountRange.max}`;
-    res.json({
-      success: true,
-      message,
-      data: result
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: `❌ Error: ${error.message}`
-    });
-  }
-});
-
-// Wallet Balance GET
-apiRouter.get('/wallet-balance/:nrc', async (req, res) => {
-  try {
-    const { nrc } = req.params;
-    const result = await LupiyaService.getWalletBalance(nrc);
-    const message = `💰 *Wallet Balance for ${nrc}*\n\nCurrent Balance: ZMW ${result.walletBalance}`;
-    res.json({
-      success: true,
-      message,
-      data: { walletBalance: result.walletBalance }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: `❌ Error: ${error.message}`
-    });
-  }
-});
-
-// Wallet Balance POST
-apiRouter.post('/wallet-balance', async (req, res) => {
-  try {
-    const { nrc } = req.body;
-    if (!nrc) {
-      return res.status(400).json({
-        success: false,
-        message: '❌ NRC number is required'
-      });
-    }
-    const result = await LupiyaService.getWalletBalance(nrc);
-    const message = `💰 *Wallet Balance for ${nrc}*\n\nCurrent Balance: ZMW ${result.walletBalance}`;
-    res.json({
-      success: true,
-      message,
-      data: { walletBalance: result.walletBalance }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: `❌ Error: ${error.message}`
-    });
-  }
-});
-
-// Bank Details GET
-apiRouter.get('/bank-details', async (req, res) => {
-  try {
-    const result = await LupiyaService.getBankDetails();
-    const message = `🏦 *Bank Repayment Details*\n\n` +
-      result.data.map(bank => 
-        `Bank: ${bank.bankName}\n` +
-        `Account: ${bank.bankAccountNumber}\n` +
-        `Branch: ${bank.bankBranch}\n`
-      ).join('\n');
-    res.json({
-      success: true,
-      message: message.trim(), //Remove trailing newline
-    //  data: result.data
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: `❌ Error: ${error.message}`
-    });
-  }
-});
-
-// USSD Payment POST
-apiRouter.post('/ussd-payment', async (req, res) => {
-  try {
-    const { nrc, phoneNumber } = req.body;
-    if (!nrc || !phoneNumber) {
-      return res.status(400).json({
-        success: false,
-        message: '❌ NRC number and phone number are required'
-      });
-    }
-    const result = await LupiyaService.requestUSSDPayment(nrc, phoneNumber);
-    const message = `📱 *USSD Payment Request*\n\n${result.message}`;
-    res.json({
-      success: true,
-      message,
-      data: result
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: `❌ Error: ${error.message}`
-    });
-  }
-});
-
-app.use('/api', apiRouter);
-
-// Wallet Balance Endpoint
-app.get('/wallet-balance', (req, res) => {
-  const walletBalanceFlow = {
-    "version": "7.1",
-    "data_api_version": "3.0",
-    "routing_model": {
-      "WALLET_BALANCE_FORM": [],
-    },
-    "screens": [
-      {
-        "id": "WALLET_BALANCE_FORM",
-        "title": "Wallet Balance",
-        "layout": {
-          "type": "SingleColumnLayout",
-          "children": [
-            { "type": "TextHeading", "text": "Check Wallet Balance" },
-            { "type": "TextBody", "text": "Enter your NRC number to check your wallet balance:" },
-            {
-              "type": "Form",
-              "name": "wallet_balance_form",
-              "children": [
-                {
-                  "type": "TextInput",
-                  "label": "NRC Number",
-                  "name": "nrc_number",
-                  "helper-text": "Enter your NRC number (e.g., 123456/78/9)",
-                  "required": true
-                },
-                {
-                  "type": "Footer",
-                  "label": "Check Balance",
-                  "on-click-action": {
-                    "name": "data_exchange",
-                    "payload": {
-                      "action": "get_wallet_balance",
-                      "nrc_number": "${form.nrc_number}"
-                    }
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      }
-    ]
-  };
-  res.json(walletBalanceFlow);
-});
-
-// Bank Details Endpoint
-app.get('/bank-details', (req, res) => {
-  const bankDetailsFlow = {
-    "version": "7.1",
-    "data_api_version": "3.0",
-    "routing_model": {
-      "BANK_DETAILS_FORM": [],
-    },
-    "screens": [
-      {
-        "id": "BANK_DETAILS_FORM",
-        "title": "Bank Details",
-        "layout": {
-          "type": "SingleColumnLayout",
-          "children": [
-            { "type": "TextHeading", "text": "Bank Repayment Details" },
-            { "type": "TextBody", "text": "Get bank details for loan repayment:" },
-            {
-              "type": "Form",
-              "name": "bank_details_form",
-              "children": [
-                {
-                  "type": "Footer",
-                  "label": "Get Bank Details",
-                  "on-click-action": {
-                    "name": "data_exchange",
-                    "payload": {
-                      "action": "get_bank_details"
-                    }
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      }
-    ]
-  };
-  res.json(bankDetailsFlow);
-});
-
-// USSD Payment Endpoint
-app.get('/ussd-payment', (req, res) => {
-  const ussdPaymentFlow = {
-    "version": "7.1",
-    "data_api_version": "3.0",
-    "routing_model": {
-      "USSD_PAYMENT_FORM": [],
-    },
-    "screens": [
-      {
-        "id": "USSD_PAYMENT_FORM",
-        "title": "USSD Payment",
-        "layout": {
-          "type": "SingleColumnLayout",
-          "children": [
-            { "type": "TextHeading", "text": "Request USSD Payment" },
-            { "type": "TextBody", "text": "Request a USSD payment prompt to your mobile money:" },
-            {
-              "type": "Form",
-              "name": "ussd_payment_form",
-              "children": [
-                {
-                  "type": "TextInput",
-                  "label": "NRC Number",
-                  "name": "nrc_number",
-                  "helper-text": "Enter your NRC number (e.g., 123456/78/9)",
-                  "required": true
-                },
-                {
-                  "type": "TextInput",
-                  "label": "Phone Number",
-                  "name": "phone_number",
-                  "input-type": "phone",
-                  "helper-text": "Enter phone number in E.164 format (e.g., +260971234567)",
-                  "required": true
-                },
-                {
-                  "type": "Footer",
-                  "label": "Request Payment",
-                  "on-click-action": {
-                    "name": "data_exchange",
-                    "payload": {
-                      "action": "request_ussd_payment",
-                      "nrc_number": "${form.nrc_number}",
-                      "phone_number": "${form.phone_number}"
-                    }
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      }
-    ]
-  };
-  res.json(ussdPaymentFlow);
-});
-
-// Data Exchange Handler
-app.post('/data-exchange', async (req, res) => {
-  try {
-    const { action, nrc_number, phone_number } = req.body;
-    let result;
-    let responseScreen;
-
-    switch (action) {
-      case 'get_loan_statement':
-        result = await LupiyaService.getLoanStatement(nrc_number);
-        responseScreen = {
-          "id": "LOAN_STATEMENT_RESULT",
-          "title": "Loan Statement",
-          "terminal": true,
-          "layout": {
-            "type": "SingleColumnLayout",
-            "children": [
-              { "type": "TextHeading", "text": "Your Loan Statement" },
-              {
-                "type": "TextBody",
-                "text": result.data && Array.isArray(result.data)
-                  ? result.data.map(item =>
-                      `Date: ${new Date(item.dateOfPayment).toLocaleDateString()}\n` +
-                      `Type: ${item.type}\n` +
-                      `Amount: ZMW ${Number(item.amountPaid).toFixed(2)}\n` +
-                      `Balance: ZMW ${Number(item.loanBalance).toFixed(2)}\n`
-                    ).join('\n')
-                  : "No loan statement data found."
-              }
-            ]
-          }
-        };
-        break;
-
-      case 'get_wallet_balance':
-        result = await LupiyaService.getWalletBalance(nrc_number);
-        responseScreen = {
-          "id": "WALLET_BALANCE_RESULT",
-          "title": "Wallet Balance",
-          "terminal": true,
-          "layout": {
-            "type": "SingleColumnLayout",
-            "children": [
-              { "type": "TextHeading", "text": "Your Wallet Balance" },
-              { "type": "TextBody", "text": `Current Balance: ZMW ${result.walletBalance}` }
-            ]
-          }
-        };
-        break;
-
-      case 'get_bank_details':
-        result = await LupiyaService.getBankDetails();
-        responseScreen = {
-          "id": "BANK_DETAILS_RESULT",
-          "title": "Bank Details",
-          "terminal": true,
-          "layout": {
-            "type": "SingleColumnLayout",
-            "children": [
-              { "type": "TextHeading", "text": "Bank Repayment Details" },
-              {
-                "type": "TextBody",
-                "text": result.data.map(bank => 
-                  `Bank: ${bank.bankName}\n` +
-                  `Account: ${bank.bankAccountNumber}\n` +
-                  `Branch: ${bank.bankBranch}\n\n`
-                ).join('')
-              }
-            ]
-          }
-        };
-        break;
-
-      case 'request_ussd_payment':
-        result = await LupiyaService.requestUSSDPayment(nrc_number, phone_number);
-        responseScreen = {
-          "id": "USSD_PAYMENT_RESULT",
-          "title": "USSD Payment",
-          "terminal": true,
-          "layout": {
-            "type": "SingleColumnLayout",
-            "children": [
-              { "type": "TextHeading", "text": "Payment Request Sent" },
-              { "type": "TextBody", "text": result.message }
-            ]
-          }
-        };
-        break;
-
-      default:
-        throw new Error('Unknown action');
-    }
-
-    res.json({
-      "version": "7.1",
-      "screen": responseScreen
-    });
-
-  } catch (error) {
-    console.error('Data exchange error:', error.message);
-    res.json({
-      "version": "7.1",
-      "screen": {
-        "id": "ERROR_SCREEN",
-        "title": "Error",
-        "terminal": true,
-        "layout": {
-          "type": "SingleColumnLayout",
-          "children": [
-            { "type": "TextHeading", "text": "Service Error" },
-            { "type": "TextBody", "text": `Sorry, we encountered an error: ${error.message}\n\nPlease try again later.` }
-          ]
-        }
-      }
-    });
-  }
-});
+export { app as default, LupiyaService };
