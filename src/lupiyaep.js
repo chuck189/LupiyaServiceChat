@@ -1,3 +1,4 @@
+// lupiyaep.js
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 import express from 'express';
@@ -113,38 +114,13 @@ class LupiyaService {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'access_token': token
           }
         }
       );
       console.log("Loan Statement API Response:", response.data);
       return response.data;
     } catch (error) {
-      if (error.response?.status === 401) {
-        console.log("Received 401, trying alternative header...");
-        try {
-          const token = await getAccessToken(true);
-          const response = await axios.post(
-            `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-statement`,
-            { idNumber },
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                'access_token': token
-              }
-            }
-          );
-          console.log("Loan Statement API Response after retry:", response.data);
-          return response.data;
-        } catch (retryError) {
-          console.error("Retry with alternative header failed:", {
-            message: retryError.message,
-            status: retryError.response?.status,
-            data: retryError.response?.data
-          });
-          throw new Error('Failed to fetch loan statement after retry');
-        }
-      }
       console.error("Error fetching loan statement:", {
         message: error.message,
         status: error.response?.status,
@@ -154,7 +130,57 @@ class LupiyaService {
     }
   }
 
-  // Other methods (getWalletBalance, getBankDetails, etc.) should follow similar header logic
+  static async verifyCustomerAccount(idNumber) {
+    try {
+      const token = await getAccessToken();
+      console.log("Sending customer verification request with token:", token.substring(0, 10) + "...");
+      const response = await axios.get(
+        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/verify-customer-account`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': token
+          },
+          params: { idNumber }
+        }
+      );
+      console.log("Customer Verification API Response:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error verifying customer account:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      throw new Error('Failed to verify customer account');
+    }
+  }
+
+  static async getLoanTopupRange(idNumber) {
+    try {
+      const token = await getAccessToken();
+      console.log("Sending loan topup range request with token:", token.substring(0, 10) + "...");
+      const response = await axios.post(
+        `${LUPIYA_CONFIG.baseUrl}/api/v1/services/messaging/whatsapp/loan-topup-range`,
+        { idNumber },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': token
+          }
+        }
+      );
+      console.log("Loan Topup Range API Response:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching loan topup range:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      throw new Error('Failed to fetch loan topup range');
+    }
+  }
 }
 
 app.post('/send-email', async (req, res) => {
