@@ -351,6 +351,99 @@ apiRouter.post('/ussd-payment', async (req, res) => {
   }
 });
 
+// In server.js, add these routes to apiRouter
+apiRouter.get('/verify-customer-account', async (req, res) => {
+  try {
+    console.log("Received verify-customer-account request:", req.query);
+    const { idNumber } = req.query;
+    if (!idNumber) {
+      console.log("Missing idNumber in query parameters");
+      return res.status(400).json({
+        success: false,
+        message: '❌ idNumber is required'
+      });
+    }
+    console.log("Verifying customer account for idNumber:", idNumber);
+    const result = await LupiyaService.verifyCustomerAccount(idNumber);
+    console.log("Verification Result:", result);
+    if (result.verified) {
+      res.json({
+        success: true,
+        message: result.message || 'Customer account verified successfully.',
+        verified: true
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: result.message || 'Customer account not found.',
+        verified: false
+      });
+    }
+  } catch (error) {
+    console.error("Error in /verify-customer-account:", error.message);
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
+// In server.js, add these routes to apiRouter
+apiRouter.post('/loan-topup-range', async (req, res) => {
+  try {
+    console.log("Received loan-topup-range request:", req.body);
+    const { idNumber } = req.body;
+    if (!idNumber) {
+      console.log("Missing idNumber in request body");
+      return res.status(400).json({
+        success: false,
+        message: '❌ idNumber is required'
+      });
+    }
+    console.log("Verifying customer for topup range with idNumber:", idNumber);
+    const verification = await LupiyaService.verifyCustomerAccount(idNumber);
+    if (!verification.verified) {
+      console.log("Customer verification failed for idNumber:", idNumber);
+      return res.status(404).json({
+        success: false,
+        message: '❌ Customer not verified. Topup range unavailable.'
+      });
+    }
+    console.log("Customer verified, fetching topup range for idNumber:", idNumber);
+    const result = await LupiyaService.getLoanTopupRange(idNumber);
+    console.log("Loan Topup Range Result:", result);
+    let message = `📊 *Topup Range for ${idNumber}*\n`;
+    let topupItems = [];
+    if (Array.isArray(result.data)) {
+      topupItems = result.data;
+    } else if (result.data && typeof result.data === 'object') {
+      topupItems = [result.data];
+    } else {
+      topupItems = [];
+    }
+    if (topupItems.length === 0) {
+      message += 'No topup range data available.';
+    } else {
+      message += topupItems.map(item =>
+        `Minimum Topup: ZMW ${Number(item.minTopup || 0).toFixed(2)}\n` +
+        `Maximum Topup: ZMW ${Number(item.maxTopup || 0).toFixed(2)}\n` +
+        'Note: Please stay within this range for topup requests.'
+      ).join('\n---\n\n');
+    }
+    res.json({
+      success: true,
+      message,
+      data: topupItems
+    });
+  } catch (error) {
+    console.error("Error in /loan-topup-range:", error.message);
+    res.status(500).json({
+      success: false,
+      message: `❌ Error: ${error.message}`
+    });
+  }
+});
+
 app.use('/api', apiRouter);
 app.use('/webhook', lupiyaEndpoints);
 app.post('/webhook', (req, res) => res.sendStatus(200));
